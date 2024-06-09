@@ -6,6 +6,8 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
+
+	"github.com/aws/aws-sdk-go/service/apprunner"
 )
 
 func Up(svc *ec2.EC2, instanceId []string) {
@@ -42,6 +44,31 @@ func Down(svc *ec2.EC2, instanceId []string) {
 
 	if err != nil {
 		log.Fatalf("Unable to stop instance, %v", err)
+	}
+	fmt.Println(result)
+}
+
+func UpAppRunner(svc *apprunner.AppRunner, serviceArn string) {
+	// up instance with specified instance id
+	input := &apprunner.ResumeServiceInput{
+		ServiceArn: aws.String(serviceArn),
+	}
+	result, err := svc.ResumeService(input)
+	if err != nil {
+		log.Fatalf("Unable to start Service, %v", err)
+	}
+	fmt.Println(result)
+}
+
+func DownAppRunner(svc *apprunner.AppRunner, serviceArn string) {
+	// up instance with specified instance id
+	input := &apprunner.PauseServiceInput{
+		ServiceArn: aws.String(serviceArn),
+	}
+
+	result, err := svc.PauseService(input)
+	if err != nil {
+		log.Fatalf("Unable to stop Service, %v", err)
 	}
 	fmt.Println(result)
 }

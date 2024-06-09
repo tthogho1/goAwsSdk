@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/aws/aws-sdk-go/service/apprunner"
 	"github.com/aws/aws-sdk-go/service/ec2"
 )
 
@@ -33,4 +34,21 @@ func Describe(svc *ec2.EC2) {
 
 		}
 	}
+}
+
+func DescribeAppRunner(svc *apprunner.AppRunner) {
+
+	input := &apprunner.ListServicesInput{}
+	result, err := svc.ListServices(input)
+
+	if err != nil {
+		log.Fatalf("Unable to list services, %v", err)
+		return
+	}
+
+	for _, service := range result.ServiceSummaryList {
+		fmt.Printf("Service Name:%s ID:%s ARN:%s Status:%s\n",
+			*service.ServiceName, *service.ServiceId, *service.ServiceArn, *service.Status)
+	}
+
 }
