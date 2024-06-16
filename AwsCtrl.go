@@ -8,38 +8,96 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/apprunner"
 	"github.com/aws/aws-sdk-go/service/ec2"
 )
 
-func main() {
+func Usage() {
+	fmt.Println()
 
-	profile := flag.String("profile", "default", "profile")
-	region := flag.String("region", "ap-northeast-1", "region")
-	cmd := flag.String("c", "describe", "command")
+	fmt.Println("Usage: goAwsSdk [options]")
+	fmt.Println()
+	fmt.Println("Examples:")
+	fmt.Println("AwsCtrl -c describe -t EC2 -i <instanceid>")
+	fmt.Println("AwsCtrl -c appRunner -t EC2 -i <instanceid>")
+	fmt.Println("AwsCtrl -c up -t EC2 -i <instanceid>")
+	fmt.Println("AwsCtrl -c up -t appRunner -s <service arn>")
 
-	instansString := flag.String("i", "", "instance id")
+	fmt.Println()
+	fmt.Println("options detail:")
+	flag.PrintDefaults()
+}
+
+type Options struct {
+	profile       *string
+	region        *string
+	cmd           *string
+	target        *string
+	help          *string
+	serviceArn    *string
+	instansString *string
+}
+
+func OptionParse() Options {
+
+	Options := Options{}
+	Options.profile = flag.String("profile", "default", "Specifiy Credential profile")
+	Options.region = flag.String("region", "ap-northeast-1", "Specify AWS region")
+	Options.cmd = flag.String("c", "describe", "command : describe | up |down")
+	Options.target = flag.String("t", "EC2", "target : EC2 | appRunner")
+	Options.help = flag.String("h", "help", "help")
+
+	Options.serviceArn = flag.String("s", "", "service arn")
+	Options.instansString = flag.String("i", "", "instance id")
 
 	flag.Parse()
-	fmt.Printf("profile: %s, region: %s\n", *profile, *region)
+	fmt.Printf("profile: %s, region: %s\n", *Options.profile, *Options.region)
 
-	instanceIds := strings.Split(*instansString, ",")
+	return Options
+}
+
+func main() {
+
+	Options := OptionParse()
+
+	instanceIds := strings.Split(*Options.instansString, ",")
 	sess := session.Must(session.NewSessionWithOptions(session.Options{
-		Profile: *profile, // specify profile
+		Profile: *Options.profile, // specify profile
 	}))
 
-	switch *cmd {
-	case "describe":
-		//  create a EC2 service client
-		svc := ec2.New(sess, aws.NewConfig().WithRegion(*region))
-		utils.Describe(svc)
-	case "up":
-		svc := ec2.New(sess, aws.NewConfig().WithRegion(*region))
-		utils.Up(svc, instanceIds)
-	case "down":
-		svc := ec2.New(sess, aws.NewConfig().WithRegion(*region))
-		utils.Down(svc, instanceIds)
-	default:
-		fmt.Println("unknown command")
+	if *Options.help == "help" {
+		flag.PrintDefaults()
+		Usage()
+		return
 	}
 
+	switch *Options.cmd {
+	case "describe":
+		//  create a EC2 service client
+		if *Options.target == "EC2" {
+			svc := ec2.New(sess, aws.NewConfig().WithRegion(*Options.region))
+			utils.Describe(svc)
+		} else if *Options.target == "appRunner" {
+			svc := apprunner.New(sess, aws.NewConfig().WithRegion(*Options.region))
+			utils.DescribeAppRunner(svc)
+		}
+	case "up":
+		if *Options.target == "EC2" {
+			svc := ec2.New(sess, aws.NewConfig().WithRegion(*Options.region))
+			utils.Up(svc, instanceIds)
+		} else if *Options.target == "appRunner" {
+			svc := apprunner.New(sess, aws.NewConfig().WithRegion(*Options.region))
+			utils.UpAppRunner(svc, Options.serviceArn)
+		}
+	case "down":
+		if *Options.target == "EC2" {
+			svc := ec2.New(sess, aws.NewConfig().WithRegion(*Options.region))
+			utils.Down(svc, instanceIds)
+		} else if *Options.target == "appRunner" {
+			svc := apprunner.New(sess, aws.NewConfig().WithRegion(*Options.region))
+			utils.DownAppRunner(svc, Options.serviceArn)
+		}
+	default:
+		Usage()
+	}
 }
