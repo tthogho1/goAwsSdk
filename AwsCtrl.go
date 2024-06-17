@@ -10,6 +10,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/apprunner"
 	"github.com/aws/aws-sdk-go/service/ec2"
+	"github.com/aws/aws-sdk-go/service/s3"
 )
 
 func Usage() {
@@ -22,6 +23,7 @@ func Usage() {
 	fmt.Println("AwsCtrl -c appRunner -t EC2 -i <instanceid>")
 	fmt.Println("AwsCtrl -c up -t EC2 -i <instanceid>")
 	fmt.Println("AwsCtrl -c up -t appRunner -s <service arn>")
+	fmt.Println("AwsCtrl -c S3download -b <bucketName> -t <localdir>")
 
 	fmt.Println()
 	fmt.Println("options detail:")
@@ -36,6 +38,7 @@ type Options struct {
 	help          *string
 	serviceArn    *string
 	instansString *string
+	bucketName    *string
 }
 
 func OptionParse() Options {
@@ -43,12 +46,14 @@ func OptionParse() Options {
 	Options := Options{}
 	Options.profile = flag.String("profile", "default", "Specifiy Credential profile")
 	Options.region = flag.String("region", "ap-northeast-1", "Specify AWS region")
-	Options.cmd = flag.String("c", "describe", "command : describe | up |down")
-	Options.target = flag.String("t", "EC2", "target : EC2 | appRunner")
-	Options.help = flag.String("h", "help", "help")
+	Options.cmd = flag.String("c", "describe", "command : describe | up |down | S3download")
+	Options.target = flag.String("t", "EC2", "target : EC2 | appRunner | local dir")
+	Options.help = flag.String("h", "", "help")
 
 	Options.serviceArn = flag.String("s", "", "service arn")
 	Options.instansString = flag.String("i", "", "instance id")
+
+	Options.bucketName = flag.String("b", "", "bucket name")
 
 	flag.Parse()
 	fmt.Printf("profile: %s, region: %s\n", *Options.profile, *Options.region)
@@ -97,6 +102,16 @@ func main() {
 			svc := apprunner.New(sess, aws.NewConfig().WithRegion(*Options.region))
 			utils.DownAppRunner(svc, Options.serviceArn)
 		}
+	case "S3download":
+		sess, errs3 := session.NewSession(&aws.Config{
+			Region: aws.String(*Options.region), // 例: us-west-2
+		})
+		if errs3 != nil {
+			fmt.Println(errs3)
+		}
+
+		svc := s3.New(sess)
+		utils.Download(svc, *Options.bucketName, *Options.target)
 	default:
 		Usage()
 	}
