@@ -19,11 +19,11 @@ func Usage() {
 	fmt.Println("Usage: goAwsSdk [options]")
 	fmt.Println()
 	fmt.Println("Examples:")
-	fmt.Println("AwsCtrl -c describe -t EC2 -i <instanceid>")
-	fmt.Println("AwsCtrl -c appRunner -t EC2 -i <instanceid>")
-	fmt.Println("AwsCtrl -c up -t EC2 -i <instanceid>")
-	fmt.Println("AwsCtrl -c up -t appRunner -s <service arn>")
-	fmt.Println("AwsCtrl -c S3download -b <bucketName> -t <localdir>")
+	fmt.Println("awsctrl -c describe -t EC2 -i <instanceid> <-p> <pattern>")
+	fmt.Println("awsctrl -c appRunner -t EC2 -i <instanceid>")
+	fmt.Println("awsctrl -c up -t EC2 -i <instanceid>")
+	fmt.Println("awsctrl -c up -t appRunner -s <service arn>")
+	fmt.Println("awsctrl -c S3download -b <bucketName> -t <localdir>")
 
 	fmt.Println()
 	fmt.Println("options detail:")
@@ -39,6 +39,7 @@ type Options struct {
 	serviceArn    *string
 	instansString *string
 	bucketName    *string
+	pattern       *string
 }
 
 func OptionParse() Options {
@@ -48,6 +49,7 @@ func OptionParse() Options {
 	Options.region = flag.String("region", "ap-northeast-1", "Specify AWS region")
 	Options.cmd = flag.String("c", "describe", "command : describe | up |down | S3download")
 	Options.target = flag.String("t", "EC2", "target : EC2 | appRunner | local dir")
+	Options.pattern = flag.String("p", "", "regression pattern for Names of Tag")
 	Options.help = flag.String("h", "", "help")
 
 	Options.serviceArn = flag.String("s", "", "service arn")
@@ -81,10 +83,10 @@ func main() {
 		//  create a EC2 service client
 		if *Options.target == "EC2" {
 			svc := ec2.New(sess, aws.NewConfig().WithRegion(*Options.region))
-			utils.Describe(svc)
+			utils.Describe(svc, Options.pattern)
 		} else if *Options.target == "appRunner" {
 			svc := apprunner.New(sess, aws.NewConfig().WithRegion(*Options.region))
-			utils.DescribeAppRunner(svc)
+			utils.DescribeAppRunner(svc, Options.pattern)
 		}
 	case "up":
 		if *Options.target == "EC2" {
