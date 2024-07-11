@@ -37,6 +37,31 @@ func Download(svc *s3.S3, bucket string, localdir string) {
 		}
 		continuationToken = resp.NextContinuationToken
 	}
+}
+
+func UploadFile(svc *s3.S3, bucket string, localfile string) {
+	uploader := s3manager.NewUploaderWithClient(svc)
+
+	file, err := os.Open(localfile)
+	if err != nil {
+		fmt.Printf("Could not open file: %s\n", err)
+		return
+	}
+	defer file.Close()
+
+	fileName := filepath.Base(localfile)
+	// ファイルをアップロード
+	result, err := uploader.Upload(&s3manager.UploadInput{
+		Bucket: aws.String(bucket),
+		Key:    aws.String(fileName),
+		Body:   file,
+	})
+
+	if err != nil {
+		fmt.Printf("Failed to Upload: %s\n", err)
+	} else {
+		fmt.Printf("Success to Upload: %s\n", result.Location)
+	}
 
 }
 
