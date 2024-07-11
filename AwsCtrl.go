@@ -24,6 +24,7 @@ func Usage() {
 	fmt.Println("awsctrl -c up -t EC2 -i <instanceid>")
 	fmt.Println("awsctrl -c up -t appRunner -s <service arn>")
 	fmt.Println("awsctrl -c S3download -b <bucketName> -t <localdir>")
+	fmt.Println("awsctrl -c S3upload -b <bucketName> -f <localdir>")
 
 	fmt.Println()
 	fmt.Println("options detail:")
@@ -40,6 +41,7 @@ type Options struct {
 	instansString *string
 	bucketName    *string
 	pattern       *string
+	file          *string
 }
 
 func OptionParse() Options {
@@ -50,11 +52,11 @@ func OptionParse() Options {
 	Options.cmd = flag.String("c", "describe", "command : describe | up |down | S3download")
 	Options.target = flag.String("t", "EC2", "target : EC2 | appRunner | local dir")
 	Options.pattern = flag.String("p", "", "regression pattern for Names of Tag")
+	Options.file = flag.String("f", "", "upload file name")
 	Options.help = flag.String("h", "", "help")
 
 	Options.serviceArn = flag.String("s", "", "service arn")
 	Options.instansString = flag.String("i", "", "instance id")
-
 	Options.bucketName = flag.String("b", "", "bucket name")
 
 	flag.Parse()
@@ -106,7 +108,7 @@ func main() {
 		}
 	case "S3download":
 		sess, errs3 := session.NewSession(&aws.Config{
-			Region: aws.String(*Options.region), // 例: us-west-2
+			Region: aws.String(*Options.region),
 		})
 		if errs3 != nil {
 			fmt.Println(errs3)
@@ -114,6 +116,24 @@ func main() {
 
 		svc := s3.New(sess)
 		utils.Download(svc, *Options.bucketName, *Options.target)
+	case "S3upload":
+		/*	sess, errs3 := session.NewSession(&aws.Config{
+			Region: aws.String(*Options.region),
+		})*/
+
+		sess, errs3 := session.NewSessionWithOptions(session.Options{
+			Config: aws.Config{
+				Region: aws.String(*Options.region),
+			},
+			Profile: *Options.profile,
+		})
+
+		if errs3 != nil {
+			fmt.Println(errs3)
+		}
+
+		svc := s3.New(sess)
+		utils.UploadFile(svc, *Options.bucketName, *Options.file)
 	default:
 		Usage()
 	}
