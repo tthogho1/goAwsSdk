@@ -2,6 +2,7 @@ package utils
 
 import (
 	"fmt"
+	"log"
 	"os"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -39,6 +40,19 @@ func Download(svc *s3.S3, bucket string, localdir string) {
 	}
 }
 
+func Upload(svc *s3.S3, bucket string, localdir string) {
+
+	files, err := os.ReadDir(localdir)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	for _, file := range files {
+		UploadFile(svc, bucket, filepath.Join(localdir, file.Name()))
+	}
+
+}
+
 func UploadFile(svc *s3.S3, bucket string, localfile string) {
 	uploader := s3manager.NewUploaderWithClient(svc)
 
@@ -62,7 +76,6 @@ func UploadFile(svc *s3.S3, bucket string, localfile string) {
 	} else {
 		fmt.Printf("Success to Upload: %s\n", result.Location)
 	}
-
 }
 
 func downloadObject(downloader *s3manager.Downloader, bucket string, key string, localdir string) {

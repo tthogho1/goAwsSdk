@@ -24,7 +24,8 @@ func Usage() {
 	fmt.Println("awsctrl -c up -t EC2 -i <instanceid>")
 	fmt.Println("awsctrl -c up -t appRunner -s <service arn>")
 	fmt.Println("awsctrl -c S3download -b <bucketName> -t <localdir>")
-	fmt.Println("awsctrl -c S3upload -b <bucketName> -f <localdir>")
+	fmt.Println("awsctrl -c S3upload -b <bucketName> -f <localfile>")
+	fmt.Println("awsctrl -c S3upload -b <bucketName> -t <localdir>")
 
 	fmt.Println()
 	fmt.Println("options detail:")
@@ -117,10 +118,6 @@ func main() {
 		svc := s3.New(sess)
 		utils.Download(svc, *Options.bucketName, *Options.target)
 	case "S3upload":
-		/*	sess, errs3 := session.NewSession(&aws.Config{
-			Region: aws.String(*Options.region),
-		})*/
-
 		sess, errs3 := session.NewSessionWithOptions(session.Options{
 			Config: aws.Config{
 				Region: aws.String(*Options.region),
@@ -133,7 +130,12 @@ func main() {
 		}
 
 		svc := s3.New(sess)
-		utils.UploadFile(svc, *Options.bucketName, *Options.file)
+		if *Options.file != "" {
+			utils.UploadFile(svc, *Options.bucketName, *Options.file)
+		} else {
+			utils.Upload(svc, *Options.bucketName, *Options.target)
+		}
+
 	default:
 		Usage()
 	}
