@@ -7,6 +7,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/apprunner"
 	"github.com/aws/aws-sdk-go/service/ec2"
+	"github.com/aws/aws-sdk-go/service/ecs"
 )
 
 func Up(svc *ec2.EC2, instanceId []string) {
@@ -45,6 +46,32 @@ func Down(svc *ec2.EC2, instanceId []string) {
 		log.Fatalf("Unable to stop instance, %v", err)
 	}
 	fmt.Println(result)
+}
+
+func DownECS(svc *ecs.ECS, pattern *string) {
+	listTasksInput := &ecs.ListTasksInput{
+		Cluster: pattern,
+	}
+	listTasksOutput, err := svc.ListTasks(listTasksInput)
+	if err != nil {
+		log.Fatalf("Failed to list tasks: %v", err)
+	}
+
+	for _, taskArn := range listTasksOutput.TaskArns {
+		input := &ecs.StopTaskInput{
+			Cluster: pattern,
+			Task:    taskArn,
+			Reason:  aws.String("Stopped by Go SDK"),
+		}
+
+		result, err := svc.StopTask(input)
+		if err != nil {
+			log.Fatalf("Failed to stop task: %v", err)
+		}
+
+		fmt.Printf("downed task: %s\n", *result.Task.TaskArn)
+		fmt.Printf("status: %s\n", *result.Task.LastStatus)
+	}
 }
 
 func UpAppRunner(svc *apprunner.AppRunner, serviceArn *string) {

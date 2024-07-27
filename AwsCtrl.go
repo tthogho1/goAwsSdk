@@ -10,6 +10,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/apprunner"
 	"github.com/aws/aws-sdk-go/service/ec2"
+	"github.com/aws/aws-sdk-go/service/ecs"
 	"github.com/aws/aws-sdk-go/service/s3"
 )
 
@@ -26,6 +27,7 @@ func Usage() {
 	fmt.Println("awsctrl -c S3download -b <bucketName> -t <localdir>")
 	fmt.Println("awsctrl -c S3upload -b <bucketName> -f <localfile>")
 	fmt.Println("awsctrl -c S3upload -b <bucketName> -t <localdir>")
+	fmt.Println("awsctrl -c describe -t ECS -n <cluster>")
 
 	fmt.Println()
 	fmt.Println("options detail:")
@@ -42,6 +44,7 @@ type Options struct {
 	instansString *string
 	bucketName    *string
 	pattern       *string
+	name          *string
 	file          *string
 }
 
@@ -51,9 +54,10 @@ func OptionParse() Options {
 	Options.profile = flag.String("profile", "default", "Specifiy Credential profile")
 	Options.region = flag.String("region", "ap-northeast-1", "Specify AWS region")
 	Options.cmd = flag.String("c", "describe", "command : describe | up |down | S3download")
-	Options.target = flag.String("t", "EC2", "target : EC2 | appRunner | local dir")
+	Options.target = flag.String("t", "EC2", "target : EC2 | appRunner | local dir | ECS")
 	Options.pattern = flag.String("p", "", "regression pattern for Names of Tag")
 	Options.file = flag.String("f", "", "upload file name")
+	Options.name = flag.String("n", "", "cluster name")
 	Options.help = flag.String("h", "", "help")
 
 	Options.serviceArn = flag.String("s", "", "service arn")
@@ -90,6 +94,9 @@ func main() {
 		} else if *Options.target == "appRunner" {
 			svc := apprunner.New(sess, aws.NewConfig().WithRegion(*Options.region))
 			utils.DescribeAppRunner(svc, Options.pattern)
+		} else if *Options.target == "ECS" {
+			svc := ecs.New(sess, aws.NewConfig().WithRegion(*Options.region))
+			utils.DescribeECS(svc, Options.name)
 		}
 	case "up":
 		if *Options.target == "EC2" {
@@ -106,6 +113,9 @@ func main() {
 		} else if *Options.target == "appRunner" {
 			svc := apprunner.New(sess, aws.NewConfig().WithRegion(*Options.region))
 			utils.DownAppRunner(svc, Options.serviceArn)
+		} else if *Options.target == "ECS" {
+			svc := ecs.New(sess, aws.NewConfig().WithRegion(*Options.region))
+			utils.DownECS(svc, Options.name)
 		}
 	case "S3download":
 		sess, errs3 := session.NewSession(&aws.Config{
