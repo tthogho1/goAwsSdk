@@ -7,6 +7,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/service/apprunner"
 	"github.com/aws/aws-sdk-go/service/ec2"
+	"github.com/aws/aws-sdk-go/service/ecs"
 )
 
 func Describe(svc *ec2.EC2, pattern *string) {
@@ -33,9 +34,7 @@ func Describe(svc *ec2.EC2, pattern *string) {
 			for _, tag := range instance.Tags {
 				fmt.Printf("  %s: %s", *tag.Key, *tag.Value)
 			}
-
 			fmt.Printf("\n")
-
 		}
 	}
 }
@@ -60,4 +59,19 @@ func DescribeAppRunner(svc *apprunner.AppRunner, pattern *string) {
 			*service.ServiceName, *service.ServiceId, *service.ServiceArn, *service.Status)
 	}
 
+}
+
+func DescribeECS(svc *ecs.ECS, pattern *string) {
+	listTasksInput := &ecs.ListTasksInput{
+		Cluster: pattern,
+	}
+
+	listTasksOutput, err := svc.ListTasks(listTasksInput)
+	if err != nil {
+		log.Fatalf("Failed to list tasks: %v", err)
+	}
+
+	for _, taskArn := range listTasksOutput.TaskArns {
+		fmt.Println(*taskArn)
+	}
 }
