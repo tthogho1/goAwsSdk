@@ -1,5 +1,4 @@
-# Cntrol EC2 by go Aws Sdk
-Get EC2 information and up/down ec2 instance
+# Cntrol AWS BY GO AWS SDK
 
 ## Usage
 Usage: goAwsSdk [options]
@@ -10,6 +9,7 @@ AwsCtrl -c appRunner -t EC2 -i <instanceid>
 AwsCtrl -c up -t EC2 -i <instanceid>  
 AwsCtrl -c up -t appRunner -s <service arn>  
 AwsCtrl -c S3download -b <bucketName> -t <localdir>  
+AwsCtrl -c describe -t ECS 
 
 options detail:  
   -b string  
