@@ -9,6 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/apprunner"
+	"github.com/aws/aws-sdk-go/service/costexplorer"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/ecs"
 	"github.com/aws/aws-sdk-go/service/s3"
@@ -28,6 +29,7 @@ func Usage() {
 	fmt.Println("awsctrl -c S3upload -b <bucketName> -f <localfile>")
 	fmt.Println("awsctrl -c S3upload -b <bucketName> -t <localdir>")
 	fmt.Println("awsctrl -c describe -t ECS -n <cluster>")
+	fmt.Println("awsctrl -c cost -start <YYYY-MM-DD> -end <YYYY-MM-DD>")
 
 	fmt.Println()
 	fmt.Println("options detail:")
@@ -46,6 +48,8 @@ type Options struct {
 	pattern       *string
 	name          *string
 	file          *string
+	start         *string
+	end           *string
 }
 
 func OptionParse() Options {
@@ -59,6 +63,9 @@ func OptionParse() Options {
 	Options.file = flag.String("f", "", "upload file name")
 	Options.name = flag.String("n", "", "cluster name")
 	Options.help = flag.String("h", "", "help")
+
+	Options.start = flag.String("start", "", "start time YYYY-MM-DD")
+	Options.end = flag.String("end", "", "end time YYYY-MM-DD")
 
 	Options.serviceArn = flag.String("s", "", "service arn")
 	Options.instansString = flag.String("i", "", "instance id")
@@ -86,6 +93,9 @@ func main() {
 	}
 
 	switch *Options.cmd {
+	case "cost":
+		svc := costexplorer.New(sess)
+		utils.Cost(svc, *Options.start, *Options.end)
 	case "describe":
 		//  create a EC2 service client
 		if *Options.target == "EC2" {
