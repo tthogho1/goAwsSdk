@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/apprunner"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/ecs"
@@ -74,4 +75,26 @@ func DescribeECS(svc *ecs.ECS, pattern *string) {
 	for _, taskArn := range listTasksOutput.TaskArns {
 		fmt.Println(*taskArn)
 	}
+}
+
+func DescribeAMI(svc *ec2.EC2, pattern *string) {
+
+	var filter = "amazon"
+	if *pattern != "" {
+		filter = *pattern
+	}
+
+	params := &ec2.DescribeImagesInput{
+		Owners:     []*string{aws.String(filter)},
+		MaxResults: aws.Int64(10),
+	}
+
+	res, err := svc.DescribeImages(params)
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+	for _, image := range res.Images {
+		fmt.Println(*image.ImageId, *image.Name, *image.CreationDate)
+	}
+
 }
