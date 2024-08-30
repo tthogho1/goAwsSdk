@@ -13,8 +13,8 @@ awsctrl -c describe -t ECS
 awsctrl -c create EC2 -key <keypair> -ec2type <ec2type> -network-interfaces <json String>
 
 options detail:  
-  -b string  
-    	bucket name  
+-b string  
+    bucket name  
   -c string  
     	command : describe | up |down (default "describe")  
   -h string  
@@ -28,21 +28,21 @@ options detail:
   -s string  
     	service arn  
   -t string  
-    	target : EC2 | appRunner | lodaldir (default "EC2") 
-  -ec2type 
+    	target : EC2 | appRunner | localdir (default "EC2")  
+  -ec2type string  
       ec2type : like t2.micro  
-  -nerwork-interfaces string string
-      need 4 value
-       public_ip_address : true|flase  // when true public ipadress added
-       device_index : 0     // only one network-interface 
-       subne_id :  <subnet-nnnnn>
-       gropus: [<security_group_id>]  // array of security group id
+  -nerwork-interfaces string  
+    need 4 value  
+       public_ip_address : true|flase  // when true public ipadress added  
+       device_index : 0     // only one network-interface  
+       subne_id :  <subnet-nnnnn>  
+       gropus: [<security_group_id>]  // array of security group id  
 
-     example 
-      {"public_ip_address":true,"device_index":0,"subnet_id":"subnet-05f2a9a81d40d433d","groups":["sg-05c48f49dbf81efeb"]}
+     example  
+      {"public_ip_address":true,"device_index":0,"subnet_id":"subnet-05f2a9a81d40d433d","groups":["sg-05c48f49dbf81efeb"]} 
       
-   -key string
-      key pairename 
+   -key string  
+      key pairename  
 
 
 
