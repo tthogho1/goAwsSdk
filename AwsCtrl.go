@@ -1,6 +1,7 @@
 package main
 
 import (
+	"awsctrl/types"
 	"awsctrl/utils"
 	"flag"
 	"fmt"
@@ -22,6 +23,7 @@ func Usage() {
 	fmt.Println()
 	fmt.Println("Examples:")
 	fmt.Println("awsctrl -c describe -t EC2 -i <instanceid> <-p> <pattern>")
+	fmt.Println("awsctrl -c describe -t AMI ")
 	fmt.Println("awsctrl -c appRunner -t EC2 -i <instanceid>")
 	fmt.Println("awsctrl -c up -t EC2 -i <instanceid>")
 	fmt.Println("awsctrl -c up -t appRunner -s <service arn>")
@@ -30,6 +32,7 @@ func Usage() {
 	fmt.Println("awsctrl -c S3upload -b <bucketName> -t <localdir>")
 	fmt.Println("awsctrl -c describe -t ECS -n <cluster>")
 	fmt.Println("awsctrl -c cost -start <YYYY-MM-DD> -end <YYYY-MM-DD>")
+	fmt.Println("awsctrl -c create -t EC2 -ami <ami id> -type <instance type>")
 
 	fmt.Println()
 	fmt.Println("options detail:")
@@ -50,6 +53,10 @@ type Options struct {
 	file          *string
 	start         *string
 	end           *string
+	ec2type       *string
+	amiString     *string
+	keyPair       *string
+	network       *types.NetWorkIF
 }
 
 func OptionParse() Options {
@@ -57,7 +64,7 @@ func OptionParse() Options {
 	Options := Options{}
 	Options.profile = flag.String("profile", "default", "Specifiy Credential profile")
 	Options.region = flag.String("region", "ap-northeast-1", "Specify AWS region")
-	Options.cmd = flag.String("c", "describe", "command : describe | up |down | S3download")
+	Options.cmd = flag.String("c", "describe", "command : describe | up |down | S3download | AMI")
 	Options.target = flag.String("t", "EC2", "target : EC2 | appRunner | local dir | ECS")
 	Options.pattern = flag.String("p", "", "regression pattern for Names of Tag")
 	Options.file = flag.String("f", "", "upload file name")
@@ -71,8 +78,21 @@ func OptionParse() Options {
 	Options.instansString = flag.String("i", "", "instance id")
 	Options.bucketName = flag.String("b", "", "bucket name")
 
-	flag.Parse()
+	Options.ec2type = flag.String("ec2type", "t2.micro", "instance type")
+	Options.keyPair = flag.String("key", "", "key pair name")
+	Options.amiString = flag.String("ami", "", "ami id")
+
 	fmt.Printf("profile: %s, region: %s\n", *Options.profile, *Options.region)
+
+	// json部分
+	netWorkFlag := &types.NetWorkIF{Data: make(map[string]interface{})}
+	flag.Var(netWorkFlag, "network-interfaces", "JSON形式の入力")
+	flag.Parse()
+
+	Options.network = netWorkFlag
+
+	//
+	fmt.Printf("Parsed JSON: %+v\n", netWorkFlag.Data)
 
 	return Options
 }
@@ -93,6 +113,13 @@ func main() {
 	}
 
 	switch *Options.cmd {
+	case "create":
+		if *Options.target == "EC2" {
+			svc := ec2.New(sess, aws.NewConfig().WithRegion(*Options.region))
+			utils.CreateInstance(svc, *Options.amiString, *Options.ec2type, *Options.keyPair, *Options.network)
+		} else {
+			fmt.Println("create target " + *Options.target + " is Invalid")
+		}
 	case "cost":
 		svc := costexplorer.New(sess)
 		utils.Cost(svc, *Options.start, *Options.end)
@@ -101,12 +128,21 @@ func main() {
 		if *Options.target == "EC2" {
 			svc := ec2.New(sess, aws.NewConfig().WithRegion(*Options.region))
 			utils.Describe(svc, Options.pattern)
+
 		} else if *Options.target == "appRunner" {
 			svc := apprunner.New(sess, aws.NewConfig().WithRegion(*Options.region))
 			utils.DescribeAppRunner(svc, Options.pattern)
+
 		} else if *Options.target == "ECS" {
 			svc := ecs.New(sess, aws.NewConfig().WithRegion(*Options.region))
 			utils.DescribeECS(svc, Options.name)
+		} else if *Options.target == "AMI" {
+
+			svc := ec2.New(sess, aws.NewConfig().WithRegion(*Options.region))
+			utils.DescribeAMI(svc, Options.pattern)
+
+		} else {
+			fmt.Println("describe target " + *Options.target + " is Invalid")
 		}
 	case "up":
 		if *Options.target == "EC2" {
