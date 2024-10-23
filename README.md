@@ -13,7 +13,7 @@ awsctrl -c describe -t ECS
 awsctrl -c create EC2 -key <keypair> -ec2type <ec2type> -network-interfaces <json String>
 
 options detail:  
--b string  
+  -b string  
     bucket name  
   -c string  
     	command : describe | up |down (default "describe")  
