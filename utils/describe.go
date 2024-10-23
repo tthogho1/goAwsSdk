@@ -96,5 +96,59 @@ func DescribeAMI(svc *ec2.EC2, pattern *string) {
 	for _, image := range res.Images {
 		fmt.Println(*image.ImageId, *image.Name, *image.CreationDate)
 	}
+}
 
+func SecurityGroupInfo(result *ec2.DescribeSecurityGroupsOutput) {
+
+	if len(result.SecurityGroups) > 0 {
+		sg := result.SecurityGroups[0]
+		fmt.Printf("Security Group Details:\n")
+		fmt.Printf("  ID: %s\n", *sg.GroupId)
+		fmt.Printf("  Name: %s\n", *sg.GroupName)
+		fmt.Printf("  Description: %s\n", *sg.Description)
+		fmt.Printf("  VPC ID: %s\n", *sg.VpcId)
+
+		fmt.Println("Inbound Rules:")
+		for _, rule := range sg.IpPermissions {
+			fmt.Printf("  Protocol: %s\n", *rule.IpProtocol)
+			fmt.Printf("  Port Range: %d - %d\n", *rule.FromPort, *rule.ToPort)
+			for _, ipRange := range rule.IpRanges {
+				fmt.Printf("    CIDR: %s\n", *ipRange.CidrIp)
+			}
+		}
+
+		fmt.Println("Outbound Rules:")
+		for _, rule := range sg.IpPermissionsEgress {
+			fmt.Printf("  Protocol: %s\n", *rule.IpProtocol)
+			fmt.Printf("  Port Range: %d - %d\n", *rule.FromPort, *rule.ToPort)
+			for _, ipRange := range rule.IpRanges {
+				fmt.Printf("    CIDR: %s\n", *ipRange.CidrIp)
+			}
+		}
+	} else {
+		fmt.Println("No security group found with the specified ID")
+	}
+}
+
+func DescribeSecurityGroup(svc *ec2.EC2, groupID *string) {
+
+	var params *ec2.DescribeSecurityGroupsInput
+	if *groupID != "" {
+		params = &ec2.DescribeSecurityGroupsInput{
+			GroupIds: []*string{
+				aws.String(*groupID),
+			},
+		}
+	} else {
+		params = nil
+	}
+
+	res, err := svc.DescribeSecurityGroups(params)
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+
+	for _, group := range res.SecurityGroups {
+		fmt.Println(*group.GroupId, *group.GroupName, *group.Description)
+	}
 }
