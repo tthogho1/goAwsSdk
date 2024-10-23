@@ -24,6 +24,7 @@ func Usage() {
 	fmt.Println("Examples:")
 	fmt.Println("awsctrl -c describe -t EC2 -i <instanceid> <-p> <pattern>")
 	fmt.Println("awsctrl -c describe -t AMI ")
+	fmt.Println("awsctrl -c describe -t SecurityGroup ")
 	fmt.Println("awsctrl -c appRunner -t EC2 -i <instanceid>")
 	fmt.Println("awsctrl -c up -t EC2 -i <instanceid>")
 	fmt.Println("awsctrl -c up -t appRunner -s <service arn>")
@@ -56,6 +57,7 @@ type Options struct {
 	ec2type       *string
 	amiString     *string
 	keyPair       *string
+	groupID       *string
 	network       *types.NetWorkIF
 }
 
@@ -64,8 +66,8 @@ func OptionParse() Options {
 	Options := Options{}
 	Options.profile = flag.String("profile", "default", "Specifiy Credential profile")
 	Options.region = flag.String("region", "ap-northeast-1", "Specify AWS region")
-	Options.cmd = flag.String("c", "describe", "command : describe | up |down | S3download | AMI")
-	Options.target = flag.String("t", "EC2", "target : EC2 | appRunner | local dir | ECS")
+	Options.cmd = flag.String("c", "describe", "command : describe | up |down | S3download | AMI ")
+	Options.target = flag.String("t", "EC2", "target : EC2 | appRunner | local dir | ECS | SecurityGroup")
 	Options.pattern = flag.String("p", "", "regression pattern for Names of Tag")
 	Options.file = flag.String("f", "", "upload file name")
 	Options.name = flag.String("n", "", "cluster name")
@@ -81,6 +83,7 @@ func OptionParse() Options {
 	Options.ec2type = flag.String("ec2type", "t2.micro", "instance type")
 	Options.keyPair = flag.String("key", "", "key pair name")
 	Options.amiString = flag.String("ami", "", "ami id")
+	Options.groupID = flag.String("g", "", "group id")
 
 	fmt.Printf("profile: %s, region: %s\n", *Options.profile, *Options.region)
 
@@ -136,10 +139,14 @@ func main() {
 		} else if *Options.target == "ECS" {
 			svc := ecs.New(sess, aws.NewConfig().WithRegion(*Options.region))
 			utils.DescribeECS(svc, Options.name)
-		} else if *Options.target == "AMI" {
 
+		} else if *Options.target == "AMI" {
 			svc := ec2.New(sess, aws.NewConfig().WithRegion(*Options.region))
 			utils.DescribeAMI(svc, Options.pattern)
+
+		} else if *Options.target == "SecurityGroup" {
+			svc := ec2.New(sess, aws.NewConfig().WithRegion(*Options.region))
+			utils.DescribeSecurityGroup(svc, Options.groupID)
 
 		} else {
 			fmt.Println("describe target " + *Options.target + " is Invalid")
