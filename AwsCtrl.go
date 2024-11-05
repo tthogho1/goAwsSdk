@@ -33,7 +33,8 @@ func Usage() {
 	fmt.Println("awsctrl -c S3upload -b <bucketName> -t <localdir>")
 	fmt.Println("awsctrl -c describe -t ECS -n <cluster>")
 	fmt.Println("awsctrl -c cost -start <YYYY-MM-DD> -end <YYYY-MM-DD>")
-	fmt.Println("awsctrl -c create -t EC2 -ami <ami id> -type <instance type>")
+	fmt.Println("awsctrl -c create -t EC2 -ami <ami id> -type <instance type> -key <string> -nerwork-interfaces <string>")
+	fmt.Println("awsctrl -c exec -exec <cmdstring> -t EC2 -i <instanceid> ")
 
 	fmt.Println()
 	fmt.Println("options detail:")
@@ -58,6 +59,7 @@ type Options struct {
 	amiString     *string
 	keyPair       *string
 	groupID       *string
+	cmdstring     *string
 	network       *types.NetWorkIF
 }
 
@@ -66,7 +68,7 @@ func OptionParse() Options {
 	Options := Options{}
 	Options.profile = flag.String("profile", "default", "Specifiy Credential profile")
 	Options.region = flag.String("region", "ap-northeast-1", "Specify AWS region")
-	Options.cmd = flag.String("c", "describe", "command : describe | up |down | S3download | AMI ")
+	Options.cmd = flag.String("c", "describe", "command : describe | up |down | S3download | AMI |exec")
 	Options.target = flag.String("t", "EC2", "target : EC2 | appRunner | local dir | ECS | SecurityGroup")
 	Options.pattern = flag.String("p", "", "regression pattern for Names of Tag")
 	Options.file = flag.String("f", "", "upload file name")
@@ -85,7 +87,7 @@ func OptionParse() Options {
 	Options.amiString = flag.String("ami", "", "ami id")
 	Options.groupID = flag.String("g", "", "group id")
 
-	fmt.Printf("profile: %s, region: %s\n", *Options.profile, *Options.region)
+	Options.cmdstring = flag.String("exec", "", "command string")
 
 	// json部分
 	netWorkFlag := &types.NetWorkIF{Data: make(map[string]interface{})}
@@ -104,6 +106,8 @@ func main() {
 
 	Options := OptionParse()
 
+	fmt.Printf("profile: %s, region: %s\n", *Options.profile, *Options.region)
+
 	instanceIds := strings.Split(*Options.instansString, ",")
 	sess := session.Must(session.NewSessionWithOptions(session.Options{
 		Profile: *Options.profile, // specify profile
@@ -116,6 +120,18 @@ func main() {
 	}
 
 	switch *Options.cmd {
+	case "exec":
+		execSession, err := session.NewSessionWithOptions(session.Options{
+			Config: aws.Config{
+				Region: aws.String(*Options.region),
+			},
+			Profile: *Options.profile})
+
+		if err != nil {
+			fmt.Println("failed to create session", err)
+			return
+		}
+		utils.Exec(execSession, *Options.instansString, *Options.cmdstring)
 	case "create":
 		if *Options.target == "EC2" {
 			svc := ec2.New(sess, aws.NewConfig().WithRegion(*Options.region))

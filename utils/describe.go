@@ -20,7 +20,7 @@ func Describe(svc *ec2.EC2, pattern *string) {
 	// インスタンス情報の表
 	for _, reservation := range result.Reservations {
 		for _, instance := range reservation.Instances {
-
+			fmt.Println(instance.Tags)
 			if !IsPatternMatch(instance.Tags, pattern) {
 				continue
 			}
