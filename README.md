@@ -10,7 +10,7 @@ awsctrl -c up -t EC2 -i <instanceid>
 awsctrl -c up -t appRunner -s <service arn>  
 awsctrl -c S3download -b <bucketName> -t <localdir>  
 awsctrl -c describe -t ECS  
-awsctrl -c create -t EC2 -key <keypair> -ec2type <ec2type> -network-interfaces <json String>
+awsctrl -c create -t EC2 -key <keypair> -ec2type <ec2type> -network-interfaces <json String>  
 awsctrl -c exec -exec <cmdstring> -t EC2 -i <instanceid> 
 ```
 options detail:  
