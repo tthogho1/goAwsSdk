@@ -9,7 +9,7 @@ import (
 
 // Tag名に指定されたPatternに一致するものがあればTrueを返す
 func IsPatternMatch(tags []*ec2.Tag, pattern *string) bool {
-	if pattern == nil {
+	if len(tags) == 0 || pattern == nil || *pattern == "" {
 		return true
 	}
 
