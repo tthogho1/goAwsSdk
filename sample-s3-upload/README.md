@@ -1,0 +1,159 @@
+# S3 フォルダアップロードツール
+
+このプログラムは、ローカルフォルダ内のすべてのファイルをAWS S3バケットにアップロードするGoアプリケーションです。
+
+## 機能
+
+- ローカルディレクトリ内のすべてのファイルを再帰的にスキャン
+- 各ファイルをS3にアップロード
+- 相対パス構造をS3でも維持
+- オプションでS3プレフィックスを指定可能
+- アップロードの進捗表示
+- エラーハンドリングとサマリー表示
+
+## 前提条件
+
+- Go 1.21以上
+- AWS認証情報が設定済み（AWS CLI、環境変数、IAMロールなど）
+- S3バケットへの書き込み権限
+
+## インストール
+
+```bash
+# 依存関係をインストール
+go mod tidy
+```
+
+## 使用方法
+
+### 基本的な使用方法
+
+```bash
+# test-filesフォルダ内のファイルをmy-bucketにアップロード
+go run main.go -bucket my-bucket -dir ./test-files
+```
+
+### オプション付きの使用方法
+
+```bash
+# プレフィックス付きでアップロード
+go run main.go -bucket my-bucket -dir ./test-files -prefix uploads/
+
+# 別のリージョンとプロファイルを指定
+go run main.go -bucket my-bucket -dir ./test-files -region us-west-2 -profile dev
+```
+
+### ヘルプの表示
+
+```bash
+go run main.go -help
+```
+
+## コマンドラインオプション
+
+| オプション | 説明 | デフォルト値 | 必須 |
+|-----------|------|-------------|------|
+| `-bucket` | S3バケット名 | - | ✅ |
+| `-dir` | アップロードするローカルディレクトリ | - | ✅ |
+| `-prefix` | S3でのプレフィックス（オプション） | "" | ❌ |
+| `-region` | AWSリージョン | ap-northeast-1 | ❌ |
+| `-profile` | AWSプロファイル | default | ❌ |
+| `-help` | ヘルプを表示 | false | ❌ |
+
+## 例
+
+### 例1: 基本的なアップロード
+
+```bash
+go run main.go -bucket my-test-bucket -dir ./test-files
+```
+
+この例では、`./test-files`フォルダ内のすべてのファイルが`my-test-bucket`にアップロードされます。
+
+### 例2: プレフィックス付きアップロード
+
+```bash
+go run main.go -bucket my-test-bucket -dir ./test-files -prefix documents/2024/
+```
+
+この例では、ファイルがS3の`documents/2024/`以下にアップロードされます。
+
+### 例3: 本番環境での使用
+
+```bash
+go run main.go -bucket production-bucket -dir ./production-files -region us-east-1 -profile prod
+```
+
+## フォルダ構造の例
+
+ローカルフォルダ構造:
+```
+test-files/
+├── sample1.txt
+├── sample2.txt
+├── data.json
+└── subfolder/
+    └── nested-file.txt
+```
+
+S3でのアップロード結果（プレフィックスなし）:
+```
+s3://my-bucket/
+├── sample1.txt
+├── sample2.txt
+├── data.json
+└── subfolder/
+    └── nested-file.txt
+```
+
+S3でのアップロード結果（プレフィックス: `uploads/`）:
+```
+s3://my-bucket/uploads/
+├── sample1.txt
+├── sample2.txt
+├── data.json
+└── subfolder/
+    └── nested-file.txt
+```
+
+## エラーハンドリング
+
+- 存在しないディレクトリを指定した場合、エラーメッセージを表示して終了
+- 個別ファイルのアップロードに失敗した場合、エラーを表示して次のファイルに進む
+- 最終的にアップロード成功/失敗のサマリーを表示
+
+## セキュリティ注意事項
+
+- AWS認証情報を適切に管理してください
+- S3バケットのアクセス権限を適切に設定してください
+- 機密ファイルを誤ってアップロードしないよう注意してください
+
+## トラブルシューティング
+
+### AWS認証エラー
+
+```
+Error: failed to create AWS session
+```
+
+AWS認証情報が正しく設定されているか確認してください：
+
+```bash
+aws configure list
+```
+
+### バケットアクセスエラー
+
+```
+Error: Access Denied
+```
+
+指定したS3バケットへの書き込み権限があるか確認してください。
+
+### ファイルが見つからない
+
+```
+Error: directory does not exist
+```
+
+指定したローカルディレクトリが存在するか確認してください。
