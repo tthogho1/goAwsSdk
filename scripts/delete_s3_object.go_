@@ -1,0 +1,88 @@
+// delete_s3_object.go
+//
+// Usage examples:
+//   go run delete_s3_object.go -bucket my-bucket -keyfile keys.txt -dryrun
+//   go run delete_s3_object.go -bucket my-bucket -keyfile keys.txt -profile dev
+//
+// `keys.txt` should contain one S3 object key per line (keys may include '/').
+// Test with `-dryrun` before performing real deletions.
+
+package main
+
+import (
+	"bufio"
+	"context"
+	"flag"
+	"fmt"
+	"log"
+	"os"
+	"strings"
+
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/s3"
+)
+
+func main() {
+    bucket := flag.String("bucket", "", "S3 bucket name (required)")
+    keyFile := flag.String("keyfile", "", "Path to file containing object keys to delete (one per line) (required)")
+    region := flag.String("region", "ap-northeast-1", "AWS region")
+    profile := flag.String("profile", "", "AWS profile name (optional)")
+    dryRun := flag.Bool("dryrun", false, "If set, will not delete, only print keys to delete")
+    flag.Parse()
+
+    if *bucket == "" || *keyFile == "" {
+        fmt.Println("Usage:")
+        flag.PrintDefaults()
+        os.Exit(1)
+    }
+
+    sessOpts := session.Options{
+        Config: aws.Config{
+            Region: aws.String(*region),
+        },
+    }
+    if *profile != "" {
+        sessOpts.Profile = *profile
+    }
+
+    sess, err := session.NewSessionWithOptions(sessOpts)
+    if err != nil {
+        log.Fatalf("failed to create AWS session: %v", err)
+    }
+    svc := s3.New(sess)
+
+    f, err := os.Open(*keyFile)
+    if err != nil {
+        log.Fatalf("failed to open key file: %v", err)
+    }
+    defer f.Close()
+
+    scanner := bufio.NewScanner(f)
+    ctx := context.Background()
+    line := 0
+    for scanner.Scan() {
+        line++
+        key := strings.TrimSpace(scanner.Text())
+        if key == "" {
+            continue
+        }
+        if *dryRun {
+            fmt.Printf("[dryrun] would delete: %s\n", key)
+            continue
+        }
+        _, err := svc.DeleteObjectWithContext(ctx, &s3.DeleteObjectInput{
+            Bucket: aws.String(*bucket),
+            Key:    aws.String(key),
+        })
+        if err != nil {
+            fmt.Printf("Failed to delete key (line %d): %s -> %v\n", line, key, err)
+            continue
+        }
+        fmt.Printf("Deleted: %s\n", key)
+    }
+    if err := scanner.Err(); err != nil {
+        log.Fatalf("error reading key file: %v", err)
+    }
+    fmt.Println("Completed.")
+}

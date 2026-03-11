@@ -1,0 +1,15 @@
+# Ignore all batch files
+*.bat
+
+# Ignore executable files
+*.exe
+
+# Ignore zip files
+*.zip
+
+# Ignore key lists
+keys.txt
+key.txt
+# also ignore keys inside scripts/
+scripts/keys.txt
+scripts/key.txt
