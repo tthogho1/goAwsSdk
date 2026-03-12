@@ -1,0 +1,2 @@
+This is sample file 2 for S3 upload testing.
+このファイルはアップロードテスト用です。

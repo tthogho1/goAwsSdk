@@ -1,0 +1,11 @@
+{
+  "name": "sample-data",
+  "version": "1.0.0",
+  "description": "S3アップロード用のサンプルJSONファイル",
+  "data": {
+    "items": [
+      { "id": 1, "name": "アイテム1" },
+      { "id": 2, "name": "アイテム2" }
+    ]
+  }
+}
