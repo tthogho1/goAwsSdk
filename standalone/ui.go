@@ -83,160 +83,26 @@ func layoutTable(gtx layout.Context, th *material.Theme) layout.Dimensions {
 			}
 		}
 		visibleDirty = false
-		fmt.Println("Recomputed visibleIndices; filter=", headerStatusFilter, "count=", len(visibleIndices))
+		fmt.Println("Recomputed visibleIndices; filter=", headerStatusFilter, "count=", len(visibleIndices), "menuOpen=", headerStatusMenuOpen)
 	}
 
-	// header extra row when menu open
-	headerExtraRows := 0
-	if headerStatusMenuOpen {
-		headerExtraRows = 1
-	}
-	totalRows := 1 + headerExtraRows + len(visibleIndices)
+	fmt.Println("layoutTable frame; menuOpen=", headerStatusMenuOpen)
 
-	return material.List(th, &tableList).Layout(gtx, totalRows, func(gtx layout.Context, index int) layout.Dimensions {
-		isHeader := index == 0
+	// Build flex children: header + optional menu + data rows
+	var flexChildren []layout.FlexChild
 
-		// 行の背景色（デフォルト） — will adjust after we know visible-row index
-		bgColor := color.NRGBA{R: 255, G: 255, B: 255, A: 255}
-
-		// データ行のon/offトグル処理
-		// index mapping:
-		// 0 = header
-		// 1 = optional menu row (if open)
-		// data rows start at offset = 1 + headerExtraRows
-		rowIdx := index - 1 - headerExtraRows
-		isMenu := headerStatusMenuOpen && index == 1
-
-		if isMenu {
-			// render selector row
-			return drawRowBackground(gtx, bgColor, func(gtx layout.Context) layout.Dimensions {
-				return layout.UniformInset(unit.Dp(4)).Layout(gtx, func(gtx layout.Context) layout.Dimensions {
-					// Buttons: All, Running, Stopped, Other
-					dims := layout.Flex{Alignment: layout.Middle}.Layout(gtx,
-						layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-							btn := material.Button(th, &headerMenuAll, "All")
-							if headerStatusFilter == "" {
-								btn.Background = color.NRGBA{R: 200, G: 220, B: 255, A: 255}
-							}
-							return btn.Layout(gtx)
-						}),
-						layout.Rigid(layout.Spacer{Width: unit.Dp(8)}.Layout),
-						layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-							btn := material.Button(th, &headerMenuRunning, "Running")
-							if headerStatusFilter == "running" {
-								btn.Background = color.NRGBA{R: 200, G: 220, B: 255, A: 255}
-							}
-							return btn.Layout(gtx)
-						}),
-						layout.Rigid(layout.Spacer{Width: unit.Dp(8)}.Layout),
-						layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-							btn := material.Button(th, &headerMenuStopped, "Stopped")
-							if headerStatusFilter == "stopped" {
-								btn.Background = color.NRGBA{R: 200, G: 220, B: 255, A: 255}
-							}
-							return btn.Layout(gtx)
-						}),
-						layout.Rigid(layout.Spacer{Width: unit.Dp(8)}.Layout),
-						layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-							btn := material.Button(th, &headerMenuOther, "Other")
-							if headerStatusFilter == "other" {
-								btn.Background = color.NRGBA{R: 200, G: 220, B: 255, A: 255}
-							}
-							return btn.Layout(gtx)
-						}),
-					)
-
-					// handle clicks
-					for headerMenuAll.Clicked(gtx) {
-						headerStatusFilter = ""
-						headerStatusMenuOpen = false
-						visibleDirty = true
-						fmt.Println("Header menu: All selected")
-					}
-					for headerMenuRunning.Clicked(gtx) {
-						headerStatusFilter = "running"
-						headerStatusMenuOpen = false
-						visibleDirty = true
-						fmt.Println("Header menu: Running selected")
-					}
-					for headerMenuStopped.Clicked(gtx) {
-						headerStatusFilter = "stopped"
-						headerStatusMenuOpen = false
-						visibleDirty = true
-						fmt.Println("Header menu: Stopped selected")
-					}
-					for headerMenuOther.Clicked(gtx) {
-						headerStatusFilter = "other"
-						headerStatusMenuOpen = false
-						visibleDirty = true
-						fmt.Println("Header menu: Other selected")
-					}
-
-					return dims
-				})
-			})
-		}
-
-		// map to actual instance index using cached visibleIndices
-		var actualIdx int
-		displayIdx := rowIdx
-		if !isHeader {
-			if rowIdx < 0 || rowIdx >= len(visibleIndices) {
-				return layout.Dimensions{}
-			}
-			actualIdx = visibleIndices[rowIdx]
-			if actualIdx >= 0 && actualIdx < len(toggleBtns) {
-				for toggleBtns[actualIdx].Clicked(gtx) {
-					if desiredStatus[actualIdx] == "on" {
-						desiredStatus[actualIdx] = "off"
-					} else if desiredStatus[actualIdx] == "off" {
-						desiredStatus[actualIdx] = "on"
-					}
-				}
-			}
-		}
-
-		// Determine zebra striping based on the visible/display index
-		if isHeader {
-			bgColor = color.NRGBA{R: 220, G: 220, B: 240, A: 255}
-		} else {
-			if displayIdx%2 == 0 {
-				bgColor = color.NRGBA{R: 245, G: 245, B: 245, A: 255}
-			} else {
-				bgColor = color.NRGBA{R: 255, G: 255, B: 255, A: 255}
-			}
-		}
-
-		return drawRowBackground(gtx, bgColor, func(gtx layout.Context) layout.Dimensions {
+	// Header row
+	flexChildren = append(flexChildren, layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+		return drawRowBackground(gtx, color.NRGBA{R: 220, G: 220, B: 240, A: 255}, func(gtx layout.Context) layout.Dimensions {
 			return layout.UniformInset(unit.Dp(4)).Layout(gtx, func(gtx layout.Context) layout.Dimensions {
-				var cells []string
-				if isHeader {
-					cells = headers
-				} else {
-					inst := instances[actualIdx]
-					statusDisplay := "-"
-					if actualIdx < len(desiredStatus) {
-						statusDisplay = desiredStatus[actualIdx]
-						if desiredStatus[actualIdx] != originalStatus[actualIdx] {
-							statusDisplay += "*"
-						}
-					}
-					cells = []string{inst.ID, inst.Status, inst.InstanceType, inst.PrivateIP, inst.PublicIP, inst.Name, statusDisplay}
-				}
-
-				children := make([]layout.FlexChild, len(cells))
-				for i, cell := range cells {
-					cellText := cell
+				children := make([]layout.FlexChild, len(headers))
+				for i, h := range headers {
 					colW := colWidths[i]
-					bold := isHeader
-					cellIdx := i
+					idx := i
 					children[i] = layout.Rigid(func(gtx layout.Context) layout.Dimensions {
 						gtx.Constraints.Min.X = gtx.Dp(colW)
 						gtx.Constraints.Max.X = gtx.Dp(colW)
-
-						// header status clickable
-						if isHeader && cellIdx == 1 {
-							// display current filter
+						if idx == 1 {
 							display := "Status"
 							if headerStatusFilter != "" {
 								display = display + " (" + headerStatusFilter + ")"
@@ -251,9 +117,130 @@ func layoutTable(gtx layout.Context, th *material.Theme) layout.Dimensions {
 								return lbl.Layout(gtx)
 							})
 						}
+						lbl := material.Body2(th, h)
+						lbl.Font.Weight = font.Bold
+						lbl.MaxLines = 1
+						return lbl.Layout(gtx)
+					})
+				}
+				return layout.Flex{}.Layout(gtx, children...)
+			})
+		})
+	}))
 
-						// on/off列（最終列）の特殊レンダリング
-						if cellIdx == 6 && !isHeader && actualIdx < len(toggleBtns) {
+	// Selector menu (outside the list)
+	if headerStatusMenuOpen {
+		flexChildren = append(flexChildren, layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+			return drawRowBackground(gtx, color.NRGBA{R: 245, G: 245, B: 245, A: 255}, func(gtx layout.Context) layout.Dimensions {
+				return layout.UniformInset(unit.Dp(4)).Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+				fmt.Println("Rendering selector row (outside list)")
+				return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
+					layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+						fmt.Println("Render menu button: All")
+						return headerMenuAll.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+							lbl := material.Body2(th, "All")
+							if headerStatusFilter == "" {
+								lbl.Color = color.NRGBA{R: 0, G: 80, B: 160, A: 255}
+							}
+							return lbl.Layout(gtx)
+						})
+					}),
+					layout.Rigid(layout.Spacer{Width: unit.Dp(8)}.Layout),
+					layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+						fmt.Println("Render menu button: Running")
+						return headerMenuRunning.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+							lbl := material.Body2(th, "Running")
+							if headerStatusFilter == "running" {
+								lbl.Color = color.NRGBA{R: 0, G: 80, B: 160, A: 255}
+							}
+							return lbl.Layout(gtx)
+						})
+					}),
+					layout.Rigid(layout.Spacer{Width: unit.Dp(8)}.Layout),
+					layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+						fmt.Println("Render menu button: Stopped")
+						return headerMenuStopped.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+							lbl := material.Body2(th, "Stopped")
+							if headerStatusFilter == "stopped" {
+								lbl.Color = color.NRGBA{R: 0, G: 80, B: 160, A: 255}
+							}
+							return lbl.Layout(gtx)
+						})
+					}),
+					layout.Rigid(layout.Spacer{Width: unit.Dp(8)}.Layout),
+					layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+						fmt.Println("Render menu button: Other")
+						return headerMenuOther.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+							lbl := material.Body2(th, "Other")
+							if headerStatusFilter == "other" {
+								lbl.Color = color.NRGBA{R: 0, G: 80, B: 160, A: 255}
+							}
+							return lbl.Layout(gtx)
+						})
+					}),
+				)
+				})
+			})
+		}))
+
+		// handle clicks for menu buttons
+		for headerMenuAll.Clicked(gtx) {
+			headerStatusFilter = ""
+			headerStatusMenuOpen = false
+			visibleDirty = true
+			fmt.Println("Header menu: All selected")
+		}
+		for headerMenuRunning.Clicked(gtx) {
+			headerStatusFilter = "running"
+			headerStatusMenuOpen = false
+			visibleDirty = true
+			fmt.Println("Header menu: Running selected")
+		}
+		for headerMenuStopped.Clicked(gtx) {
+			headerStatusFilter = "stopped"
+			headerStatusMenuOpen = false
+			visibleDirty = true
+			fmt.Println("Header menu: Stopped selected")
+		}
+		for headerMenuOther.Clicked(gtx) {
+			headerStatusFilter = "other"
+			headerStatusMenuOpen = false
+			visibleDirty = true
+			fmt.Println("Header menu: Other selected")
+		}
+	}
+
+	// Data rows
+	flexChildren = append(flexChildren, layout.Flexed(1, func(gtx layout.Context) layout.Dimensions {
+		return material.List(th, &tableList).Layout(gtx, len(visibleIndices), func(gtx layout.Context, idx int) layout.Dimensions {
+		// idx maps to visibleIndices
+		actualIdx := visibleIndices[idx]
+		// zebra background
+		bg := color.NRGBA{R: 255, G: 255, B: 255, A: 255}
+		if idx%2 == 0 {
+			bg = color.NRGBA{R: 245, G: 245, B: 245, A: 255}
+		}
+		return drawRowBackground(gtx, bg, func(gtx layout.Context) layout.Dimensions {
+			return layout.UniformInset(unit.Dp(4)).Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+				inst := instances[actualIdx]
+				statusDisplay := "-"
+				if actualIdx < len(desiredStatus) {
+					statusDisplay = desiredStatus[actualIdx]
+					if desiredStatus[actualIdx] != originalStatus[actualIdx] {
+						statusDisplay += "*"
+					}
+				}
+				cells := []string{inst.ID, inst.Status, inst.InstanceType, inst.PrivateIP, inst.PublicIP, inst.Name, statusDisplay}
+				children := make([]layout.FlexChild, len(cells))
+				for i, cell := range cells {
+					cellText := cell
+					colW := colWidths[i]
+					cellIdx := i
+					children[i] = layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+						gtx.Constraints.Min.X = gtx.Dp(colW)
+						gtx.Constraints.Max.X = gtx.Dp(colW)
+						// on/off column
+						if cellIdx == 6 && actualIdx < len(toggleBtns) {
 							return toggleBtns[actualIdx].Layout(gtx, func(gtx layout.Context) layout.Dimensions {
 								lbl := material.Body2(th, cellText)
 								lbl.Font.Weight = font.Bold
@@ -269,11 +256,7 @@ func layoutTable(gtx layout.Context, th *material.Theme) layout.Dimensions {
 								return lbl.Layout(gtx)
 							})
 						}
-
 						lbl := material.Body2(th, cellText)
-						if bold {
-							lbl.Font.Weight = font.Bold
-						}
 						lbl.MaxLines = 1
 						return lbl.Layout(gtx)
 					})
@@ -282,6 +265,9 @@ func layoutTable(gtx layout.Context, th *material.Theme) layout.Dimensions {
 			})
 		})
 	})
+	}))
+
+	return layout.Flex{Axis: layout.Vertical}.Layout(gtx, flexChildren...)
 }
 
 // drawRowBackground は行の背景色を描画
@@ -295,3 +281,4 @@ func drawRowBackground(gtx layout.Context, col color.NRGBA, w layout.Widget) lay
 		layout.Stacked(w),
 	)
 }
+
