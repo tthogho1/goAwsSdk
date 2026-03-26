@@ -1,10 +1,14 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"image/color"
 	"os"
 	"strings"
+
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 
 	"gioui.org/app"
 	"gioui.org/layout"
@@ -24,13 +28,14 @@ var (
 	desiredStatus  []string
 	toggleBtns     []widget.Clickable
 
-	headerStatusBtn    widget.Clickable
-	headerStatusFilter string
-	headerStatusMenuOpen bool
-	headerMenuAll        widget.Clickable
-	headerMenuRunning    widget.Clickable
-	headerMenuStopped    widget.Clickable
-	headerMenuOther      widget.Clickable
+	// per-cell clickables for copy-to-clipboard
+	cellClickables []widget.Clickable
+
+	// search UI
+	searchEditor widget.Editor
+	searchQuery  string
+
+    
 
 	profileEditor widget.Editor
 	fetchBtn      widget.Clickable
@@ -42,9 +47,30 @@ var (
 	// visibleIndices is a cached list of instance indices that match the current filter
 	visibleIndices []int
 	visibleDirty   bool
+	logPath string
 )
 
 func main() {
+	// CLI: allow setting logfile path (default: ./app.log)
+	flag.StringVar(&logPath, "logfile", "", "log file path (default: ./app.log)")
+	flag.Parse()
+	if logPath == "" {
+		logPath = "./app.log"
+	}
+	// initialize logger
+	f, lg, s, err := initLogger(logPath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "cannot initialize logger %s: %v\n", logPath, err)
+		os.Exit(1)
+	}
+	logFile = f
+	logger = lg
+	sugar = s
+	defer func() {
+		_ = f.Close()
+		_ = logger.Sync()
+	}()
+
 	// .env 読み込み
 	if err := loadEnv(".env"); err != nil {
 		fmt.Fprintf(os.Stderr, ".envファイル読み込みエラー: %v\n", err)
@@ -139,7 +165,15 @@ func run(w *app.Window) error {
 				}
 			}
 
-			// メインレイアウト: 上部バー + メッセージ + テーブル
+				// update search query each frame; mark dirty when changed
+				newQuery := strings.TrimSpace(searchEditor.Text())
+				if newQuery != searchQuery {
+					searchQuery = newQuery
+					visibleDirty = true
+				}
+				// search is live; editing `searchEditor` already marks `visibleDirty`
+
+				// メインレイアウト: 上部バー + メッセージ + テーブル
 			layout.Flex{Axis: layout.Vertical}.Layout(gtx,
 				layout.Rigid(func(gtx layout.Context) layout.Dimensions {
 					return layoutTopBar(gtx, th)
@@ -153,6 +187,9 @@ func run(w *app.Window) error {
 					}
 					return layout.Dimensions{}
 				}),
+				layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+					return layoutSearchBar(gtx, th)
+				}),
 				layout.Flexed(1, func(gtx layout.Context) layout.Dimensions {
 					return layoutTable(gtx, th)
 				}),
@@ -161,5 +198,22 @@ func run(w *app.Window) error {
 			e.Frame(gtx.Ops)
 		}
 	}
+}
+
+// initLogger opens the given path for append (creating if missing) and
+// returns a zap Logger and SugaredLogger that write to that file.
+func initLogger(path string) (*os.File, *zap.Logger, *zap.SugaredLogger, error) {
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	encCfg := zap.NewProductionEncoderConfig()
+	encCfg.EncodeTime = zapcore.ISO8601TimeEncoder
+	encoder := zapcore.NewJSONEncoder(encCfg)
+	writeSyncer := zapcore.AddSync(f)
+	core := zapcore.NewCore(encoder, writeSyncer, zapcore.DebugLevel)
+	lg := zap.New(core)
+	s := lg.Sugar()
+	return f, lg, s, nil
 }
 

@@ -34,6 +34,8 @@ func initStatusSlices() {
 	originalStatus = make([]string, n)
 	desiredStatus = make([]string, n)
 	toggleBtns = make([]widget.Clickable, n)
+	// create per-cell clickables: one per instance * number of columns
+	cellClickables = make([]widget.Clickable, n*len(headers))
 	for i, inst := range instances {
 		s := mapStatus(inst.Status)
 		originalStatus[i] = s

@@ -1,0 +1,61 @@
+{"level":"debug","ts":"2026-03-26T15:03:49.971+0900","msg":"Recomputed visibleIndices; filter= count=53 menuOpen=false"}
+{"level":"debug","ts":"2026-03-26T15:04:05.835+0900","msg":"headerStatusBtn clicked; menu open: true"}
+{"level":"debug","ts":"2026-03-26T15:04:05.835+0900","msg":"Rendering selector row (outside list)"}
+{"level":"debug","ts":"2026-03-26T15:04:05.835+0900","msg":"Render menu button: All"}
+{"level":"debug","ts":"2026-03-26T15:04:05.835+0900","msg":"Render menu button: Running"}
+{"level":"debug","ts":"2026-03-26T15:04:05.835+0900","msg":"Render menu button: Stopped"}
+{"level":"debug","ts":"2026-03-26T15:04:05.835+0900","msg":"Render menu button: Other"}
+{"level":"debug","ts":"2026-03-26T15:04:06.521+0900","msg":"Rendering selector row (outside list)"}
+{"level":"debug","ts":"2026-03-26T15:04:06.522+0900","msg":"Render menu button: All"}
+{"level":"debug","ts":"2026-03-26T15:04:06.522+0900","msg":"Render menu button: Running"}
+{"level":"debug","ts":"2026-03-26T15:04:06.522+0900","msg":"Render menu button: Stopped"}
+{"level":"debug","ts":"2026-03-26T15:04:06.522+0900","msg":"Render menu button: Other"}
+{"level":"debug","ts":"2026-03-26T15:04:06.635+0900","msg":"headerStatusBtn clicked; menu open: false"}
+{"level":"debug","ts":"2026-03-26T15:04:07.498+0900","msg":"headerStatusBtn clicked; menu open: true"}
+{"level":"debug","ts":"2026-03-26T15:04:07.498+0900","msg":"Rendering selector row (outside list)"}
+{"level":"debug","ts":"2026-03-26T15:04:07.498+0900","msg":"Render menu button: All"}
+{"level":"debug","ts":"2026-03-26T15:04:07.498+0900","msg":"Render menu button: Running"}
+{"level":"debug","ts":"2026-03-26T15:04:07.498+0900","msg":"Render menu button: Stopped"}
+{"level":"debug","ts":"2026-03-26T15:04:07.498+0900","msg":"Render menu button: Other"}
+{"level":"debug","ts":"2026-03-26T15:04:07.664+0900","msg":"Rendering selector row (outside list)"}
+{"level":"debug","ts":"2026-03-26T15:04:07.664+0900","msg":"Render menu button: All"}
+{"level":"debug","ts":"2026-03-26T15:04:07.664+0900","msg":"Render menu button: Running"}
+{"level":"debug","ts":"2026-03-26T15:04:07.664+0900","msg":"Render menu button: Stopped"}
+{"level":"debug","ts":"2026-03-26T15:04:07.664+0900","msg":"Render menu button: Other"}
+{"level":"debug","ts":"2026-03-26T15:04:07.722+0900","msg":"Rendering selector row (outside list)"}
+{"level":"debug","ts":"2026-03-26T15:04:07.722+0900","msg":"Render menu button: All"}
+{"level":"debug","ts":"2026-03-26T15:04:07.722+0900","msg":"Render menu button: Running"}
+{"level":"debug","ts":"2026-03-26T15:04:07.722+0900","msg":"Render menu button: Stopped"}
+{"level":"debug","ts":"2026-03-26T15:04:07.722+0900","msg":"Render menu button: Other"}
+{"level":"debug","ts":"2026-03-26T15:04:07.833+0900","msg":"Rendering selector row (outside list)"}
+{"level":"debug","ts":"2026-03-26T15:04:07.833+0900","msg":"Render menu button: All"}
+{"level":"debug","ts":"2026-03-26T15:04:07.833+0900","msg":"Render menu button: Running"}
+{"level":"debug","ts":"2026-03-26T15:04:07.833+0900","msg":"Render menu button: Stopped"}
+{"level":"debug","ts":"2026-03-26T15:04:07.833+0900","msg":"Render menu button: Other"}
+{"level":"debug","ts":"2026-03-26T15:04:07.873+0900","msg":"Rendering selector row (outside list)"}
+{"level":"debug","ts":"2026-03-26T15:04:07.873+0900","msg":"Render menu button: All"}
+{"level":"debug","ts":"2026-03-26T15:04:07.873+0900","msg":"Render menu button: Running"}
+{"level":"debug","ts":"2026-03-26T15:04:07.873+0900","msg":"Render menu button: Stopped"}
+{"level":"debug","ts":"2026-03-26T15:04:07.873+0900","msg":"Render menu button: Other"}
+{"level":"debug","ts":"2026-03-26T15:04:07.945+0900","msg":"Rendering selector row (outside list)"}
+{"level":"debug","ts":"2026-03-26T15:04:07.945+0900","msg":"Render menu button: All"}
+{"level":"debug","ts":"2026-03-26T15:04:07.945+0900","msg":"Render menu button: Running"}
+{"level":"debug","ts":"2026-03-26T15:04:07.945+0900","msg":"Render menu button: Stopped"}
+{"level":"debug","ts":"2026-03-26T15:04:07.945+0900","msg":"Render menu button: Other"}
+{"level":"debug","ts":"2026-03-26T15:04:07.953+0900","msg":"Rendering selector row (outside list)"}
+{"level":"debug","ts":"2026-03-26T15:04:07.953+0900","msg":"Render menu button: All"}
+{"level":"debug","ts":"2026-03-26T15:04:07.953+0900","msg":"Render menu button: Running"}
+{"level":"debug","ts":"2026-03-26T15:04:07.953+0900","msg":"Render menu button: Stopped"}
+{"level":"debug","ts":"2026-03-26T15:04:07.953+0900","msg":"Render menu button: Other"}
+{"level":"debug","ts":"2026-03-26T15:04:08.114+0900","msg":"Rendering selector row (outside list)"}
+{"level":"debug","ts":"2026-03-26T15:04:08.114+0900","msg":"Render menu button: All"}
+{"level":"debug","ts":"2026-03-26T15:04:08.114+0900","msg":"Render menu button: Running"}
+{"level":"debug","ts":"2026-03-26T15:04:08.114+0900","msg":"Render menu button: Stopped"}
+{"level":"debug","ts":"2026-03-26T15:04:08.114+0900","msg":"Render menu button: Other"}
+{"level":"debug","ts":"2026-03-26T15:04:08.225+0900","msg":"Header menu: Running selected"}
+{"level":"debug","ts":"2026-03-26T15:04:08.226+0900","msg":"Rendering selector row (outside list)"}
+{"level":"debug","ts":"2026-03-26T15:04:08.226+0900","msg":"Render menu button: All"}
+{"level":"debug","ts":"2026-03-26T15:04:08.226+0900","msg":"Render menu button: Running"}
+{"level":"debug","ts":"2026-03-26T15:04:08.226+0900","msg":"Render menu button: Stopped"}
+{"level":"debug","ts":"2026-03-26T15:04:08.226+0900","msg":"Render menu button: Other"}
+{"level":"debug","ts":"2026-03-26T15:04:08.321+0900","msg":"Recomputed visibleIndices; filter=running count=7 menuOpen=false"}
