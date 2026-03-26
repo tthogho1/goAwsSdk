@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"image/color"
 	"strings"
 
@@ -10,7 +9,19 @@ import (
 	"gioui.org/op/clip"
 	"gioui.org/op/paint"
 	"gioui.org/unit"
+	"gioui.org/widget"
 	"gioui.org/widget/material"
+	"github.com/atotto/clipboard"
+)
+
+var (
+	headerStatusBtn    widget.Clickable
+	headerStatusFilter string
+	headerStatusMenuOpen bool
+	headerMenuAll        widget.Clickable
+	headerMenuRunning    widget.Clickable
+	headerMenuStopped    widget.Clickable
+	headerMenuOther      widget.Clickable
 )
 
 // layoutTopBar はプロファイル入力欄と「取込」「実行」ボタンを描画
@@ -53,12 +64,87 @@ func layoutMessage(gtx layout.Context, th *material.Theme, msg string, col color
 	})
 }
 
+// layoutSearchBar はインスタンス名でフィルタする検索欄を描画
+func layoutSearchBar(gtx layout.Context, th *material.Theme) layout.Dimensions {
+	return layout.UniformInset(unit.Dp(8)).Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+		return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
+			layout.Flexed(1, func(gtx layout.Context) layout.Dimensions {
+				searchEditor.SingleLine = true
+				ed := material.Editor(th, &searchEditor, "Filter by name")
+				return ed.Layout(gtx)
+			}),
+		)
+	})
+}
+
 // layoutTable はインスタンス情報をテーブル形式で描画
 func layoutTable(gtx layout.Context, th *material.Theme) layout.Dimensions {
+	// handle on/off toggle button clicks
+	for i := range toggleBtns {
+		for toggleBtns[i].Clicked(gtx) {
+			if i < len(desiredStatus) && i < len(originalStatus) && originalStatus[i] != "-" {
+				if desiredStatus[i] == "on" {
+					desiredStatus[i] = "off"
+				} else {
+					desiredStatus[i] = "on"
+				}
+				logDebugf("Toggle clicked for instance %d -> desiredStatus: %s", i, desiredStatus[i])
+			}
+		}
+	}
+
+	// handle per-cell clicks (copy to clipboard)
+	cols := len(headers)
+	for i := range cellClickables {
+		for cellClickables[i].Clicked(gtx) {
+			instIdx := i / cols
+			colIdx := i % cols
+			if instIdx < 0 || instIdx >= len(instances) {
+				continue
+			}
+			var txt string
+			inst := instances[instIdx]
+			switch colIdx {
+			case 0:
+				txt = inst.ID
+			case 1:
+				txt = inst.Status
+			case 2:
+				txt = inst.InstanceType
+			case 3:
+				txt = inst.PrivateIP
+			case 4:
+				txt = inst.PublicIP
+			case 5:
+				txt = inst.Name
+			case 6:
+				if instIdx < len(desiredStatus) {
+					txt = desiredStatus[instIdx]
+				} else {
+					txt = ""
+				}
+			default:
+				txt = ""
+			}
+			if txt == "" {
+				errMsg = "コピー対象が空です"
+				infoMsg = ""
+				continue
+			}
+			if err := clipboard.WriteAll(txt); err != nil {
+				errMsg = "クリップボードにコピーできませんでした: " + err.Error()
+				infoMsg = ""
+			} else {
+				infoMsg = "Copied: " + txt
+				errMsg = ""
+			}
+		}
+	}
+
 	// when header clicked, toggle menu open
 	for headerStatusBtn.Clicked(gtx) {
 		headerStatusMenuOpen = !headerStatusMenuOpen
-		fmt.Println("headerStatusBtn clicked; menu open:", headerStatusMenuOpen)
+		logDebugf("headerStatusBtn clicked; menu open: %t", headerStatusMenuOpen)
 	}
 
 	// Recompute visible indices when needed (keeps UI responsive and consistent).
@@ -78,15 +164,22 @@ func layoutTable(gtx layout.Context, th *material.Theme) layout.Dimensions {
 					match = mapStatus(instances[i].Status) == "-"
 				}
 			}
+			// apply name search filter if present
+			if match && searchQuery != "" {
+				name := strings.ToLower(instances[i].Name)
+				if !strings.Contains(name, strings.ToLower(searchQuery)) {
+					match = false
+				}
+			}
 			if match {
 				visibleIndices = append(visibleIndices, i)
 			}
 		}
 		visibleDirty = false
-		fmt.Println("Recomputed visibleIndices; filter=", headerStatusFilter, "count=", len(visibleIndices), "menuOpen=", headerStatusMenuOpen)
+		logDebugf("Recomputed visibleIndices; filter=%s count=%d menuOpen=%t", headerStatusFilter, len(visibleIndices), headerStatusMenuOpen)
 	}
 
-	fmt.Println("layoutTable frame; menuOpen=", headerStatusMenuOpen)
+	// debug print removed to reduce console noise
 
 	// Build flex children: header + optional menu + data rows
 	var flexChildren []layout.FlexChild
@@ -133,10 +226,10 @@ func layoutTable(gtx layout.Context, th *material.Theme) layout.Dimensions {
 		flexChildren = append(flexChildren, layout.Rigid(func(gtx layout.Context) layout.Dimensions {
 			return drawRowBackground(gtx, color.NRGBA{R: 245, G: 245, B: 245, A: 255}, func(gtx layout.Context) layout.Dimensions {
 				return layout.UniformInset(unit.Dp(4)).Layout(gtx, func(gtx layout.Context) layout.Dimensions {
-				fmt.Println("Rendering selector row (outside list)")
+				logDebug("Rendering selector row (outside list)")
 				return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
 					layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-						fmt.Println("Render menu button: All")
+						logDebug("Render menu button: All")
 						return headerMenuAll.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
 							lbl := material.Body2(th, "All")
 							if headerStatusFilter == "" {
@@ -147,7 +240,7 @@ func layoutTable(gtx layout.Context, th *material.Theme) layout.Dimensions {
 					}),
 					layout.Rigid(layout.Spacer{Width: unit.Dp(8)}.Layout),
 					layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-						fmt.Println("Render menu button: Running")
+						logDebug("Render menu button: Running")
 						return headerMenuRunning.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
 							lbl := material.Body2(th, "Running")
 							if headerStatusFilter == "running" {
@@ -158,7 +251,7 @@ func layoutTable(gtx layout.Context, th *material.Theme) layout.Dimensions {
 					}),
 					layout.Rigid(layout.Spacer{Width: unit.Dp(8)}.Layout),
 					layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-						fmt.Println("Render menu button: Stopped")
+						logDebug("Render menu button: Stopped")
 						return headerMenuStopped.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
 							lbl := material.Body2(th, "Stopped")
 							if headerStatusFilter == "stopped" {
@@ -169,7 +262,7 @@ func layoutTable(gtx layout.Context, th *material.Theme) layout.Dimensions {
 					}),
 					layout.Rigid(layout.Spacer{Width: unit.Dp(8)}.Layout),
 					layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-						fmt.Println("Render menu button: Other")
+						logDebug("Render menu button: Other")
 						return headerMenuOther.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
 							lbl := material.Body2(th, "Other")
 							if headerStatusFilter == "other" {
@@ -188,25 +281,25 @@ func layoutTable(gtx layout.Context, th *material.Theme) layout.Dimensions {
 			headerStatusFilter = ""
 			headerStatusMenuOpen = false
 			visibleDirty = true
-			fmt.Println("Header menu: All selected")
+			logDebug("Header menu: All selected")
 		}
 		for headerMenuRunning.Clicked(gtx) {
 			headerStatusFilter = "running"
 			headerStatusMenuOpen = false
 			visibleDirty = true
-			fmt.Println("Header menu: Running selected")
+			logDebug("Header menu: Running selected")
 		}
 		for headerMenuStopped.Clicked(gtx) {
 			headerStatusFilter = "stopped"
 			headerStatusMenuOpen = false
 			visibleDirty = true
-			fmt.Println("Header menu: Stopped selected")
+			logDebug("Header menu: Stopped selected")
 		}
 		for headerMenuOther.Clicked(gtx) {
 			headerStatusFilter = "other"
 			headerStatusMenuOpen = false
 			visibleDirty = true
-			fmt.Println("Header menu: Other selected")
+			logDebug("Header menu: Other selected")
 		}
 	}
 
@@ -239,26 +332,38 @@ func layoutTable(gtx layout.Context, th *material.Theme) layout.Dimensions {
 					children[i] = layout.Rigid(func(gtx layout.Context) layout.Dimensions {
 						gtx.Constraints.Min.X = gtx.Dp(colW)
 						gtx.Constraints.Max.X = gtx.Dp(colW)
-						// on/off column
+						clickIdx := actualIdx*len(cells) + cellIdx
+						// ensure clickIdx within range
+						if clickIdx < 0 || clickIdx >= len(cellClickables) {
+							lbl := material.Body2(th, cellText)
+							lbl.MaxLines = 1
+							return lbl.Layout(gtx)
+						}
+						// last column: keep toggle behavior, but wrap with cell clickable for copy
 						if cellIdx == 6 && actualIdx < len(toggleBtns) {
-							return toggleBtns[actualIdx].Layout(gtx, func(gtx layout.Context) layout.Dimensions {
-								lbl := material.Body2(th, cellText)
-								lbl.Font.Weight = font.Bold
-								switch {
-								case strings.HasPrefix(cellText, "on"):
-									lbl.Color = color.NRGBA{R: 0, G: 160, B: 0, A: 255}
-								case strings.HasPrefix(cellText, "off"):
-									lbl.Color = color.NRGBA{R: 220, G: 50, B: 50, A: 255}
-								default:
-									lbl.Color = color.NRGBA{R: 150, G: 150, B: 150, A: 255}
-								}
-								lbl.MaxLines = 1
-								return lbl.Layout(gtx)
+							return cellClickables[clickIdx].Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+								return toggleBtns[actualIdx].Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+									lbl := material.Body2(th, cellText)
+									lbl.Font.Weight = font.Bold
+									switch {
+									case strings.HasPrefix(cellText, "on"):
+										lbl.Color = color.NRGBA{R: 0, G: 160, B: 0, A: 255}
+									case strings.HasPrefix(cellText, "off"):
+										lbl.Color = color.NRGBA{R: 220, G: 50, B: 50, A: 255}
+									default:
+										lbl.Color = color.NRGBA{R: 150, G: 150, B: 150, A: 255}
+									}
+									lbl.MaxLines = 1
+									return lbl.Layout(gtx)
+								})
 							})
 						}
-						lbl := material.Body2(th, cellText)
-						lbl.MaxLines = 1
-						return lbl.Layout(gtx)
+						// other columns: wrap label with clickable for copy
+						return cellClickables[clickIdx].Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+							lbl := material.Body2(th, cellText)
+							lbl.MaxLines = 1
+							return lbl.Layout(gtx)
+						})
 					})
 				}
 				return layout.Flex{}.Layout(gtx, children...)
