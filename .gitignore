@@ -7,6 +7,9 @@
 # Ignore zip files
 *.zip
 
+# Ignore log files
+*.log
+
 # Ignore key lists
 keys.txt
 key.txt

@@ -10,44 +10,18 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 
+	"ec2viewer/ui"
+
 	"gioui.org/app"
 	"gioui.org/layout"
 	"gioui.org/op"
 	"gioui.org/unit"
-	"gioui.org/widget"
 	"gioui.org/widget/material"
 )
 
 var (
 	awsctrlPath string
-	instances   []Instance
-	headers     = []string{"ID", "Status", "Type", "PrivateIP", "PublicIP", "Name", "on/off"}
-	colWidths   = []unit.Dp{180, 80, 100, 130, 130, 160, 60}
-
-	originalStatus []string
-	desiredStatus  []string
-	toggleBtns     []widget.Clickable
-
-	// per-cell clickables for copy-to-clipboard
-	cellClickables []widget.Clickable
-
-	// search UI
-	searchEditor widget.Editor
-	searchQuery  string
-
-    
-
-	profileEditor widget.Editor
-	fetchBtn      widget.Clickable
-	executeBtn    widget.Clickable
-	tableList     widget.List
-	errMsg        string
-	infoMsg       string
-
-	// visibleIndices is a cached list of instance indices that match the current filter
-	visibleIndices []int
-	visibleDirty   bool
-	logPath string
+	logPath     string
 )
 
 func main() {
@@ -81,15 +55,16 @@ func main() {
 		os.Exit(1)
 	}
 
-	profileEditor.SetText("default")
-	profileEditor.SingleLine = true
-	tableList.Axis = layout.Vertical
+	state := &ui.AppState{Logger: sugar}
+	state.ProfileEditor.SetText("default")
+	state.ProfileEditor.SingleLine = true
+	state.TableList.Axis = layout.Vertical
 
 	go func() {
 		w := new(app.Window)
 		w.Option(app.Title("EC2 Instances Viewer"))
 		w.Option(app.Size(unit.Dp(1020), unit.Dp(500)))
-		if err := run(w); err != nil {
+		if err := run(w, state); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
@@ -99,7 +74,7 @@ func main() {
 }
 
 // run はウィンドウのイベントループ
-func run(w *app.Window) error {
+func run(w *app.Window, state *ui.AppState) error {
 	th := material.NewTheme()
 	var ops op.Ops
 
@@ -111,87 +86,87 @@ func run(w *app.Window) error {
 			gtx := app.NewContext(&ops, e)
 
 			// 「取込」ボタン押下処理
-			if fetchBtn.Clicked(gtx) {
-				profile := strings.TrimSpace(profileEditor.Text())
+			if state.FetchBtn.Clicked(gtx) {
+				profile := strings.TrimSpace(state.ProfileEditor.Text())
 				if profile == "" {
-					errMsg = "プロファイルを入力してください"
-					infoMsg = ""
+					state.ErrMsg = "プロファイルを入力してください"
+					state.InfoMsg = ""
 				} else {
-					errMsg = ""
-					infoMsg = ""
+					state.ErrMsg = ""
+					state.InfoMsg = ""
 					output, err := executeAwsCtrl(profile)
 					if err != nil {
-						errMsg = fmt.Sprintf("awsctrl 実行エラー: %v", err)
+						state.ErrMsg = fmt.Sprintf("awsctrl 実行エラー: %v", err)
 					} else {
-						instances = parseOutput(output)
-						initStatusSlices()
-						if len(instances) == 0 {
-							infoMsg = "インスタンスが見つかりませんでした"
+						state.Instances = parseOutput(output)
+						state.InitStatusSlices()
+						if len(state.Instances) == 0 {
+							state.InfoMsg = "インスタンスが見つかりませんでした"
 						}
 					}
 				}
 			}
 
 			// 「実行」ボタン押下処理
-			if executeBtn.Clicked(gtx) && hasStatusChanges() {
-				profile := strings.TrimSpace(profileEditor.Text())
+			if state.ExecuteBtn.Clicked(gtx) && state.HasStatusChanges() {
+				profile := strings.TrimSpace(state.ProfileEditor.Text())
 				var errs []string
-				for i := range instances {
-					if desiredStatus[i] == originalStatus[i] || originalStatus[i] == "-" {
+				for i := range state.Instances {
+					if state.DesiredStatus[i] == state.OriginalStatus[i] || state.OriginalStatus[i] == "-" {
 						continue
 					}
 					action := "up"
-					if desiredStatus[i] == "off" {
+					if state.DesiredStatus[i] == "off" {
 						action = "down"
 					}
-					if err := executeAwsCtrlAction(profile, action, instances[i].ID); err != nil {
-						errs = append(errs, fmt.Sprintf("%s: %v", instances[i].ID, err))
+					if err := executeAwsCtrlAction(profile, action, state.Instances[i].ID); err != nil {
+						errs = append(errs, fmt.Sprintf("%s: %v", state.Instances[i].ID, err))
 					}
 				}
 				if len(errs) > 0 {
-					errMsg = "実行エラー: " + strings.Join(errs, "; ")
-					infoMsg = ""
+					state.ErrMsg = "実行エラー: " + strings.Join(errs, "; ")
+					state.InfoMsg = ""
 				} else {
 					// 成功時: 再取得してステータス更新
 					output, err := executeAwsCtrl(profile)
 					if err != nil {
-						errMsg = fmt.Sprintf("再取得エラー: %v", err)
+						state.ErrMsg = fmt.Sprintf("再取得エラー: %v", err)
 					} else {
-						instances = parseOutput(output)
-						initStatusSlices()
-						infoMsg = "実行完了"
-						errMsg = ""
+						state.Instances = parseOutput(output)
+						state.InitStatusSlices()
+						state.InfoMsg = "実行完了"
+						state.ErrMsg = ""
 					}
 				}
 			}
 
 				// update search query each frame; mark dirty when changed
-				newQuery := strings.TrimSpace(searchEditor.Text())
-				if newQuery != searchQuery {
-					searchQuery = newQuery
-					visibleDirty = true
+				newQuery := strings.TrimSpace(state.SearchEditor.Text())
+				if newQuery != state.SearchQuery {
+					state.SearchQuery = newQuery
+					state.VisibleDirty = true
 				}
-				// search is live; editing `searchEditor` already marks `visibleDirty`
+				// search is live; editing `SearchEditor` already marks `VisibleDirty`
 
 				// メインレイアウト: 上部バー + メッセージ + テーブル
 			layout.Flex{Axis: layout.Vertical}.Layout(gtx,
 				layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-					return layoutTopBar(gtx, th)
+					return ui.LayoutTopBar(gtx, th, state)
 				}),
 				layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-					if errMsg != "" {
-						return layoutMessage(gtx, th, errMsg, color.NRGBA{R: 220, G: 50, B: 50, A: 255})
+					if state.ErrMsg != "" {
+						return ui.LayoutMessage(gtx, th, state.ErrMsg, color.NRGBA{R: 220, G: 50, B: 50, A: 255})
 					}
-					if infoMsg != "" {
-						return layoutMessage(gtx, th, infoMsg, color.NRGBA{R: 50, G: 50, B: 200, A: 255})
+					if state.InfoMsg != "" {
+						return ui.LayoutMessage(gtx, th, state.InfoMsg, color.NRGBA{R: 50, G: 50, B: 200, A: 255})
 					}
 					return layout.Dimensions{}
 				}),
 				layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-					return layoutSearchBar(gtx, th)
+					return ui.LayoutSearchBar(gtx, th, state)
 				}),
 				layout.Flexed(1, func(gtx layout.Context) layout.Dimensions {
-					return layoutTable(gtx, th)
+					return ui.LayoutTable(gtx, th, state)
 				}),
 			)
 
