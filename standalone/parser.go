@@ -3,61 +3,12 @@ package main
 import (
 	"strings"
 
-	"gioui.org/widget"
+	"ec2viewer/model"
 )
 
-// Instance はEC2インスタンス情報を保持する構造体
-type Instance struct {
-	ID           string
-	Status       string
-	InstanceType string
-	PrivateIP    string
-	PublicIP     string
-	Name         string
-}
-
-// mapStatus はAWSステータスをon/off/-に変換する
-func mapStatus(awsStatus string) string {
-	switch awsStatus {
-	case "running":
-		return "on"
-	case "stopped":
-		return "off"
-	default:
-		return "-"
-	}
-}
-
-// initStatusSlices はインスタンス取得後にステータス管理用スライスを初期化する
-func initStatusSlices() {
-	n := len(instances)
-	originalStatus = make([]string, n)
-	desiredStatus = make([]string, n)
-	toggleBtns = make([]widget.Clickable, n)
-	// create per-cell clickables: one per instance * number of columns
-	cellClickables = make([]widget.Clickable, n*len(headers))
-	for i, inst := range instances {
-		s := mapStatus(inst.Status)
-		originalStatus[i] = s
-		desiredStatus[i] = s
-	}
-	// mark visible indices dirty so UI recomputes filter after a fetch
-	visibleDirty = true
-}
-
-// hasStatusChanges はon/offが変更されたインスタンスがあるかを返す
-func hasStatusChanges() bool {
-	for i := range originalStatus {
-		if originalStatus[i] != "-" && desiredStatus[i] != originalStatus[i] {
-			return true
-		}
-	}
-	return false
-}
-
 // parseOutput は awsctrl の出力テキストをパースしてインスタンス情報に変換する
-func parseOutput(output string) []Instance {
-	var result []Instance
+func parseOutput(output string) []model.Instance {
+	var result []model.Instance
 	lines := strings.Split(output, "\n")
 	for _, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -74,12 +25,12 @@ func parseOutput(output string) []Instance {
 
 // parseInstanceLine は1行のインスタンス情報をパースする
 // 入力形式: "ID: <id>,  <status>, <type>, <privateIP>, <publicIP>  <TagKey>: <TagVal>  ..."
-func parseInstanceLine(line string) Instance {
+func parseInstanceLine(line string) model.Instance {
 	line = strings.TrimPrefix(line, "ID: ")
 
 	parts := strings.SplitN(line, ", ", 5)
 	if len(parts) < 5 {
-		return Instance{}
+		return model.Instance{}
 	}
 
 	id := strings.TrimSpace(parts[0])
@@ -112,7 +63,7 @@ func parseInstanceLine(line string) Instance {
 		publicIP = strings.TrimSpace(publicIP)
 	}
 
-	return Instance{
+	return model.Instance{
 		ID:           id,
 		Status:       status,
 		InstanceType: instanceType,
