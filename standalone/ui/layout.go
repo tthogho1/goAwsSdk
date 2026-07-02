@@ -205,7 +205,9 @@ func LayoutTable(gtx layout.Context, th *material.Theme, s *AppState) layout.Dim
 						return lbl.Layout(gtx)
 					})
 				}
-				return layout.Flex{}.Layout(gtx, children...)
+				return layout.Center.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+					return layout.Flex{}.Layout(gtx, children...)
+				})
 			})
 		})
 	}))
@@ -353,7 +355,9 @@ func LayoutTable(gtx layout.Context, th *material.Theme, s *AppState) layout.Dim
 							})
 						})
 					}
-					return layout.Flex{}.Layout(gtx, children...)
+					return layout.Center.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+						return layout.Flex{}.Layout(gtx, children...)
+					})
 				})
 			})
 		})
