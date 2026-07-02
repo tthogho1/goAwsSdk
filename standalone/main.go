@@ -87,57 +87,12 @@ func run(w *app.Window, state *ui.AppState) error {
 
 			// 「取込」ボタン押下処理
 			if state.FetchBtn.Clicked(gtx) {
-				profile := strings.TrimSpace(state.ProfileEditor.Text())
-				if profile == "" {
-					state.ErrMsg = "プロファイルを入力してください"
-					state.InfoMsg = ""
-				} else {
-					state.ErrMsg = ""
-					state.InfoMsg = ""
-					output, err := executeAwsCtrl(profile)
-					if err != nil {
-						state.ErrMsg = fmt.Sprintf("awsctrl 実行エラー: %v", err)
-					} else {
-						state.Instances = parseOutput(output)
-						state.InitStatusSlices()
-						if len(state.Instances) == 0 {
-							state.InfoMsg = "インスタンスが見つかりませんでした"
-						}
-					}
-				}
+				handleFetch(state)
 			}
 
 			// 「実行」ボタン押下処理
 			if state.ExecuteBtn.Clicked(gtx) && state.HasStatusChanges() {
-				profile := strings.TrimSpace(state.ProfileEditor.Text())
-				var errs []string
-				for i := range state.Instances {
-					if state.DesiredStatus[i] == state.OriginalStatus[i] || state.OriginalStatus[i] == "-" {
-						continue
-					}
-					action := "up"
-					if state.DesiredStatus[i] == "off" {
-						action = "down"
-					}
-					if err := executeAwsCtrlAction(profile, action, state.Instances[i].ID); err != nil {
-						errs = append(errs, fmt.Sprintf("%s: %v", state.Instances[i].ID, err))
-					}
-				}
-				if len(errs) > 0 {
-					state.ErrMsg = "実行エラー: " + strings.Join(errs, "; ")
-					state.InfoMsg = ""
-				} else {
-					// 成功時: 再取得してステータス更新
-					output, err := executeAwsCtrl(profile)
-					if err != nil {
-						state.ErrMsg = fmt.Sprintf("再取得エラー: %v", err)
-					} else {
-						state.Instances = parseOutput(output)
-						state.InitStatusSlices()
-						state.InfoMsg = "実行完了"
-						state.ErrMsg = ""
-					}
-				}
+				handleExecute(state)
 			}
 
 				// update search query each frame; mark dirty when changed
