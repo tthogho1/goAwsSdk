@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"image"
 	"image/color"
 	"strings"
 
@@ -8,6 +9,7 @@ import (
 
 	"gioui.org/font"
 	"gioui.org/layout"
+	"gioui.org/op"
 	"gioui.org/op/clip"
 	"gioui.org/op/paint"
 	"gioui.org/unit"
@@ -205,9 +207,7 @@ func LayoutTable(gtx layout.Context, th *material.Theme, s *AppState) layout.Dim
 						return lbl.Layout(gtx)
 					})
 				}
-				return layout.Center.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
-					return layout.Flex{}.Layout(gtx, children...)
-				})
+				return layout.Flex{}.Layout(gtx, children...)
 			})
 		})
 	}))
@@ -355,14 +355,33 @@ func LayoutTable(gtx layout.Context, th *material.Theme, s *AppState) layout.Dim
 							})
 						})
 					}
-					return layout.Center.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
-						return layout.Flex{}.Layout(gtx, children...)
-					})
+					return layout.Flex{}.Layout(gtx, children...)
 				})
 			})
 		})
 	}))
 
+	// テーブルを水平方向に中央揃え
+	tableWidth := 0
+	for _, w := range ColWidths {
+		tableWidth += gtx.Dp(w)
+	}
+	tableWidth += 2 * gtx.Dp(unit.Dp(4)) // UniformInset(4) left + right
+
+	availW := gtx.Constraints.Max.X
+	if availW > tableWidth {
+		leftPx := (availW - tableWidth) / 2
+		macro := op.Record(gtx.Ops)
+		gtx.Constraints.Max.X = tableWidth
+		gtx.Constraints.Min.X = tableWidth
+		dims := layout.Flex{Axis: layout.Vertical}.Layout(gtx, flexChildren...)
+		call := macro.Stop()
+		stack := op.Offset(image.Point{X: leftPx}).Push(gtx.Ops)
+		call.Add(gtx.Ops)
+		stack.Pop()
+		dims.Size.X = availW
+		return dims
+	}
 	return layout.Flex{Axis: layout.Vertical}.Layout(gtx, flexChildren...)
 }
 
