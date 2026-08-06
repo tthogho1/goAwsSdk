@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"fmt"
 	"image"
 	"image/color"
 	"strings"
@@ -72,6 +73,8 @@ func LayoutSearchBar(gtx layout.Context, th *material.Theme, s *AppState) layout
 
 // LayoutTable はインスタンス情報をテーブル形式で描画
 func LayoutTable(gtx layout.Context, th *material.Theme, s *AppState) layout.Dimensions {
+	s.EnsureColVisible()
+
 	// on/off トグルボタンのクリック処理
 	for i := range s.ToggleBtns {
 		for s.ToggleBtns[i].Clicked(gtx) {
@@ -140,6 +143,20 @@ func LayoutTable(gtx layout.Context, th *material.Theme, s *AppState) layout.Dim
 		s.logDebugf("headerStatusBtn clicked; menu open: %t", s.HeaderStatusMenuOpen)
 	}
 
+	// 列表示メニューボタンのクリックで開閉
+	for s.ColMenuBtn.Clicked(gtx) {
+		s.ColMenuOpen = !s.ColMenuOpen
+	}
+	// 列表示メニュー項目のクリックで表示/非表示を切替 (ID列は必須のため除外)
+	for i := range s.ColMenuItems {
+		for s.ColMenuItems[i].Clicked(gtx) {
+			if i == 0 {
+				continue
+			}
+			s.ColVisible[i] = !s.ColVisible[i]
+		}
+	}
+
 	// 必要に応じて表示インデックスを再計算
 	if s.VisibleDirty {
 		s.VisibleIndices = s.VisibleIndices[:0]
@@ -179,11 +196,14 @@ func LayoutTable(gtx layout.Context, th *material.Theme, s *AppState) layout.Dim
 	flexChildren = append(flexChildren, layout.Rigid(func(gtx layout.Context) layout.Dimensions {
 		return drawRowBackground(gtx, color.NRGBA{R: 220, G: 220, B: 240, A: 255}, func(gtx layout.Context) layout.Dimensions {
 			return layout.UniformInset(unit.Dp(4)).Layout(gtx, func(gtx layout.Context) layout.Dimensions {
-				children := make([]layout.FlexChild, len(Headers))
+				var children []layout.FlexChild
 				for i, h := range Headers {
+					if !s.ColVisible[i] {
+						continue
+					}
 					colW := ColWidths[i]
 					idx := i
-					children[i] = layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+					children = append(children, layout.Rigid(func(gtx layout.Context) layout.Dimensions {
 						gtx.Constraints.Min.X = gtx.Dp(colW)
 						gtx.Constraints.Max.X = gtx.Dp(colW)
 						if idx == 1 {
@@ -205,12 +225,50 @@ func LayoutTable(gtx layout.Context, th *material.Theme, s *AppState) layout.Dim
 						lbl.Font.Weight = font.Bold
 						lbl.MaxLines = 1
 						return lbl.Layout(gtx)
-					})
+					}))
 				}
+				children = append(children, layout.Rigid(layout.Spacer{Width: unit.Dp(8)}.Layout))
+				children = append(children, layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+					return s.ColMenuBtn.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+						lbl := material.Body2(th, "列表示 ▾")
+						lbl.Font.Weight = font.Bold
+						return lbl.Layout(gtx)
+					})
+				}))
 				return layout.Flex{}.Layout(gtx, children...)
 			})
 		})
 	}))
+
+	// 列表示切替メニュー
+	if s.ColMenuOpen {
+		flexChildren = append(flexChildren, layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+			return drawRowBackground(gtx, color.NRGBA{R: 245, G: 245, B: 245, A: 255}, func(gtx layout.Context) layout.Dimensions {
+				return layout.UniformInset(unit.Dp(4)).Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+					var children []layout.FlexChild
+					for i, h := range Headers {
+						idx := i
+						label := h
+						children = append(children, layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+							return s.ColMenuItems[idx].Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+								mark := "☐ "
+								if s.ColVisible[idx] {
+									mark = "☑ "
+								}
+								lbl := material.Body2(th, mark+label)
+								if idx == 0 {
+									lbl.Color = color.NRGBA{R: 150, G: 150, B: 150, A: 255}
+								}
+								return lbl.Layout(gtx)
+							})
+						}))
+						children = append(children, layout.Rigid(layout.Spacer{Width: unit.Dp(8)}.Layout))
+					}
+					return layout.Flex{Alignment: layout.Middle}.Layout(gtx, children...)
+				})
+			})
+		}))
+	}
 
 	// セレクタメニュー (リストの外側)
 	if s.HeaderStatusMenuOpen {
@@ -314,12 +372,15 @@ func LayoutTable(gtx layout.Context, th *material.Theme, s *AppState) layout.Dim
 						}
 					}
 					cells := []string{inst.ID, inst.Status, inst.InstanceType, inst.PrivateIP, inst.PublicIP, inst.Name, statusDisplay}
-					children := make([]layout.FlexChild, len(cells))
+					var children []layout.FlexChild
 					for i, cell := range cells {
+						if !s.ColVisible[i] {
+							continue
+						}
 						cellText := cell
 						colW := ColWidths[i]
 						cellIdx := i
-						children[i] = layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+						children = append(children, layout.Rigid(func(gtx layout.Context) layout.Dimensions {
 							gtx.Constraints.Min.X = gtx.Dp(colW)
 							gtx.Constraints.Max.X = gtx.Dp(colW)
 							clickIdx := actualIdx*len(cells) + cellIdx
@@ -353,7 +414,7 @@ func LayoutTable(gtx layout.Context, th *material.Theme, s *AppState) layout.Dim
 								lbl.MaxLines = 1
 								return lbl.Layout(gtx)
 							})
-						})
+						}))
 					}
 					return layout.Flex{}.Layout(gtx, children...)
 				})
@@ -361,9 +422,12 @@ func LayoutTable(gtx layout.Context, th *material.Theme, s *AppState) layout.Dim
 		})
 	}))
 
-	// テーブルを水平方向に中央揃え
+	// テーブルを水平方向に中央揃え (非表示列は幅計算から除外)
 	tableWidth := 0
-	for _, w := range ColWidths {
+	for i, w := range ColWidths {
+		if !s.ColVisible[i] {
+			continue
+		}
 		tableWidth += gtx.Dp(w)
 	}
 	tableWidth += 2 * gtx.Dp(unit.Dp(4)) // UniformInset(4) left + right
@@ -383,6 +447,29 @@ func LayoutTable(gtx layout.Context, th *material.Theme, s *AppState) layout.Dim
 		return dims
 	}
 	return layout.Flex{Axis: layout.Vertical}.Layout(gtx, flexChildren...)
+}
+
+// LayoutFooter はインスタンス件数とヒントを表示するフッターを描画
+func LayoutFooter(gtx layout.Context, th *material.Theme, s *AppState) layout.Dimensions {
+	return drawRowBackground(gtx, color.NRGBA{R: 220, G: 220, B: 240, A: 255}, func(gtx layout.Context) layout.Dimensions {
+		return layout.UniformInset(unit.Dp(6)).Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+			total := len(s.Instances)
+			visible := len(s.VisibleIndices)
+			countText := fmt.Sprintf("表示中: %d / 全%d件", visible, total)
+			return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
+				layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+					lbl := material.Body2(th, countText)
+					return lbl.Layout(gtx)
+				}),
+				layout.Flexed(1, layout.Spacer{}.Layout),
+				layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+					lbl := material.Body2(th, "セルクリックでクリップボードにコピー")
+					lbl.Color = color.NRGBA{R: 100, G: 100, B: 100, A: 255}
+					return lbl.Layout(gtx)
+				}),
+			)
+		})
+	})
 }
 
 // drawRowBackground は行の背景色を描画する

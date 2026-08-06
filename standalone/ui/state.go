@@ -49,6 +49,12 @@ type AppState struct {
 	HeaderMenuStopped    widget.Clickable
 	HeaderMenuOther      widget.Clickable
 
+	// 表示列カスタマイズ
+	ColVisible   []bool
+	ColMenuOpen  bool
+	ColMenuBtn   widget.Clickable
+	ColMenuItems []widget.Clickable
+
 	// ロガー (nil 可: nil の場合デバッグログを出力しない)
 	Logger *zap.SugaredLogger
 }
@@ -92,6 +98,18 @@ func (s *AppState) InitStatusSlices() {
 
 	// layout.Vertical を設定 (ListAxis は呼び出し元で設定済みのため不要だが念のため)
 	s.TableList.Axis = layout.Vertical
+}
+
+// EnsureColVisible は表示列設定が未初期化の場合、全列表示で初期化する
+func (s *AppState) EnsureColVisible() {
+	if len(s.ColVisible) == len(Headers) {
+		return
+	}
+	s.ColVisible = make([]bool, len(Headers))
+	for i := range s.ColVisible {
+		s.ColVisible[i] = true
+	}
+	s.ColMenuItems = make([]widget.Clickable, len(Headers))
 }
 
 // HasStatusChanges はon/off が変更されたインスタンスがあるかを返す
