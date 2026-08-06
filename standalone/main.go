@@ -123,6 +123,9 @@ func run(w *app.Window, state *ui.AppState) error {
 				layout.Flexed(1, func(gtx layout.Context) layout.Dimensions {
 					return ui.LayoutTable(gtx, th, state)
 				}),
+				layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+					return ui.LayoutFooter(gtx, th, state)
+				}),
 			)
 
 			e.Frame(gtx.Ops)
