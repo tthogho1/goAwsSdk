@@ -20,7 +20,7 @@ import (
 
 // LayoutTopBar はプロファイル入力欄と「取込」「実行」ボタンを描画
 func LayoutTopBar(gtx layout.Context, th *material.Theme, s *AppState) layout.Dimensions {
-	return layout.UniformInset(unit.Dp(8)).Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+	return layout.UniformInset(unit.Dp(4)).Layout(gtx, func(gtx layout.Context) layout.Dimensions {
 		return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
 			layout.Rigid(func(gtx layout.Context) layout.Dimensions {
 				lbl := material.Body1(th, "プロファイル: ")
@@ -28,18 +28,20 @@ func LayoutTopBar(gtx layout.Context, th *material.Theme, s *AppState) layout.Di
 			}),
 			layout.Flexed(1, func(gtx layout.Context) layout.Dimensions {
 				ed := material.Editor(th, &s.ProfileEditor, "AWSプロファイル名")
-				return layout.UniformInset(unit.Dp(4)).Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+				return layout.UniformInset(unit.Dp(2)).Layout(gtx, func(gtx layout.Context) layout.Dimensions {
 					return ed.Layout(gtx)
 				})
 			}),
 			layout.Rigid(layout.Spacer{Width: unit.Dp(8)}.Layout),
 			layout.Rigid(func(gtx layout.Context) layout.Dimensions {
 				btn := material.Button(th, &s.FetchBtn, "取込")
+				btn.Inset = layout.UniformInset(unit.Dp(6))
 				return btn.Layout(gtx)
 			}),
 			layout.Rigid(layout.Spacer{Width: unit.Dp(8)}.Layout),
 			layout.Rigid(func(gtx layout.Context) layout.Dimensions {
 				btn := material.Button(th, &s.ExecuteBtn, "実行")
+				btn.Inset = layout.UniformInset(unit.Dp(6))
 				if !s.HasStatusChanges() {
 					btn.Background = color.NRGBA{R: 180, G: 180, B: 180, A: 255}
 				}
@@ -230,8 +232,10 @@ func LayoutTable(gtx layout.Context, th *material.Theme, s *AppState) layout.Dim
 				children = append(children, layout.Rigid(layout.Spacer{Width: unit.Dp(8)}.Layout))
 				children = append(children, layout.Rigid(func(gtx layout.Context) layout.Dimensions {
 					return s.ColMenuBtn.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
-						lbl := material.Body2(th, "列表示 ▾")
+						// ASCII のみ使用 (▾ 等の記号はフォールバックフォントで行高が肥大化する)
+						lbl := material.Body2(th, "列表示 v")
 						lbl.Font.Weight = font.Bold
+						lbl.MaxLines = 1
 						return lbl.Layout(gtx)
 					})
 				}))
@@ -251,11 +255,12 @@ func LayoutTable(gtx layout.Context, th *material.Theme, s *AppState) layout.Dim
 						label := h
 						children = append(children, layout.Rigid(func(gtx layout.Context) layout.Dimensions {
 							return s.ColMenuItems[idx].Layout(gtx, func(gtx layout.Context) layout.Dimensions {
-								mark := "☐ "
+								mark := "[ ] "
 								if s.ColVisible[idx] {
-									mark = "☑ "
+									mark = "[x] "
 								}
 								lbl := material.Body2(th, mark+label)
+								lbl.MaxLines = 1
 								if idx == 0 {
 									lbl.Color = color.NRGBA{R: 150, G: 150, B: 150, A: 255}
 								}
