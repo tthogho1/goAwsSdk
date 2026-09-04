@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"syscall"
 
 	"github.com/joho/godotenv"
 )
@@ -20,9 +19,7 @@ func loadEnv(path string) error {
 
 func executeAwsCtrl(profile string) (string, error) {
 	cmd := exec.Command(awsctrlPath, "-profile", profile)
-	cmd.SysProcAttr = &syscall.SysProcAttr{
-		HideWindow: true,
-	}
+	setHideWindow(cmd)
 
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -33,9 +30,7 @@ func executeAwsCtrl(profile string) (string, error) {
 
 func executeAwsCtrlAction(profile, action, instanceID string) error {
 	cmd := exec.Command(awsctrlPath, "-profile", profile, "-c", action, "-t", "EC2", "-i", instanceID)
-	cmd.SysProcAttr = &syscall.SysProcAttr{
-		HideWindow: true,
-	}
+	setHideWindow(cmd)
 
 	out, err := cmd.CombinedOutput()
 	if err != nil {
