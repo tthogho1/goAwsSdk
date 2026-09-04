@@ -4,6 +4,10 @@
 # Ignore executable files
 *.exe
 
+# Ignore built Go binaries
+/awsctrl
+/standalone/ec2viewer
+
 # Ignore zip files
 *.zip
 
