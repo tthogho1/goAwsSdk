@@ -1,59 +1,68 @@
 # EC2 Instances Viewer
 
-AWS EC2インスタンス情報をGUIテーブル形式で表示するデスクトップアプリケーション。
+A desktop application that displays AWS EC2 instance information in a GUI table.
 
-## 機能
+## Features
 
-- AWSプロファイルを画面から選択・入力
-- `awsctrl` コマンドでEC2インスタンス情報を取得
-- テーブル形式で表示（ID, Status, Type, PrivateIP, PublicIP, Cost, Name）
+- Select or enter an AWS profile from the screen
+- Fetch EC2 instance information via the `awsctrl` command
+- Display in table format (ID, Status, Type, PrivateIP, PublicIP, Cost, Name)
 
-## 前提条件
+## Prerequisites
 
-- Go (module-enabled) — 本リポジトリは Go toolchain 1.23 以降で開発されています。
-- `awsctrl` 実行バイナリ（またはパス）が利用可能であること（後述の環境変数で指定）。
-- ネイティブGUIは Gio (`gioui.org`) を使用しています（C コンパイラは不要）。
+- Go (module-enabled) — this repository is developed with Go toolchain 1.23 or later.
+- The `awsctrl` executable binary (or its path) must be available (specified via the environment variable described below).
+- The native GUI uses Gio (`gioui.org`) (no C compiler required).
 
-## セットアップ
+## Setup
 
-1. 必要に応じて `.env` ファイルを編集し、`AWSCTRL_PATH` に `awsctrl` 実行ファイルのパスを設定：
+1. If needed, edit the `.env` file and set `AWSCTRL_PATH` to the path of the `awsctrl` executable:
 
 ```env
 AWSCTRL_PATH=C:\path\to\awsctrl.exe
 ```
 
-2. 依存関係のインストール：
+2. Install dependencies:
 
 ```bash
 cd standalone
 go mod tidy
 ```
 
-3. 実行（開発時）：
+3. Run (during development):
 
 ```bash
 cd standalone
 go run .
 ```
 
-または `run.bat` をダブルクリックして起動できます。
+Or double-click `run.bat` to launch it.
 
-## ビルド
+## Build
 
 ```bash
 cd standalone
 go build -o ec2viewer.exe .
 ```
 
-## 使い方
+When building on Windows, to prevent a console window (black screen) from
+opening alongside the app, build with the `-ldflags="-H=windowsgui"` flag:
 
-1. アプリを起動
-2. プロファイル欄でAWSプロファイルを選択または入力（初期値: `default`）
-3. 「取込」ボタンを押すと EC2 インスタンス一覧がテーブルに表示されます
+```bash
+go build -ldflags="-H=windowsgui" -o ec2viewer.exe .
+```
 
-## 備考
+## Usage
 
-- クリップボード機能は `github.com/atotto/clipboard` を利用しています。プラットフォームによっては追加のツール（例: Linux の `xclip`/`xsel`）が必要です。
-- Windows 上でバイナリを上書きする際は、実行中のプロセスを停止するか、別名でビルドしてください（例: `-o ec2viewer_alt.exe`）。
+1. Launch the app
+2. Select or enter an AWS profile in the profile field (default: `default`)
+3. Press the "Fetch" button to display the list of EC2 instances in the table
 
-もし他に追記してほしい操作手順やスクリーンショットがあれば教えてください。
+## Notes
+
+
+- The clipboard feature uses `github.com/atotto/clipboard`. Depending on the platform, additional tools may be required (e.g., `xclip`/`xsel` on Linux).
+- When overwriting the binary on Windows, stop the running process first, or build with a different name (e.g., `-o ec2viewer_alt.exe`).
+
+If there are any other usage steps or screenshots you'd like added, let us know.
+

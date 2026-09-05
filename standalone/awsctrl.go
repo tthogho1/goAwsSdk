@@ -4,11 +4,31 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 
 	"github.com/joho/godotenv"
 )
 
-// loadEnv は .env ファイルから設定を読み込む
+// envFilePath determines the search path for the .env file.
+// It prefers .env in the current directory if present, otherwise it
+// looks in the directory where the executable itself resides
+// (resolving symlinks in case the app was launched via a symlink).
+func envFilePath() string {
+	if _, err := os.Stat(".env"); err == nil {
+		return ".env"
+	}
+
+	exePath, err := os.Executable()
+	if err != nil {
+		return ".env"
+	}
+	if resolved, err := filepath.EvalSymlinks(exePath); err == nil {
+		exePath = resolved
+	}
+	return filepath.Join(filepath.Dir(exePath), ".env")
+}
+
+// loadEnv loads settings from the .env file
 func loadEnv(path string) error {
 	if err := godotenv.Load(path); err != nil {
 		return err

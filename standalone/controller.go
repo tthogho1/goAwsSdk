@@ -7,7 +7,7 @@ import (
 	"ec2viewer/ui"
 )
 
-// refreshInstances は awsctrl を実行してインスタンス一覧を取得・更新する
+// refreshInstances runs awsctrl to fetch and update the instance list
 func refreshInstances(state *ui.AppState, profile string) error {
 	output, err := executeAwsCtrl(profile)
 	if err != nil {
@@ -18,26 +18,26 @@ func refreshInstances(state *ui.AppState, profile string) error {
 	return nil
 }
 
-// handleFetch は「取込」ボタン押下時の処理を担う
+// handleFetch handles the processing when the "Fetch" button is pressed
 func handleFetch(state *ui.AppState) {
 	profile := strings.TrimSpace(state.ProfileEditor.Text())
 	if profile == "" {
-		state.ErrMsg = "プロファイルを入力してください"
+		state.ErrMsg = "Please enter a profile"
 		state.InfoMsg = ""
 		return
 	}
 	state.ErrMsg = ""
 	state.InfoMsg = ""
 	if err := refreshInstances(state, profile); err != nil {
-		state.ErrMsg = fmt.Sprintf("awsctrl 実行エラー: %v", err)
+		state.ErrMsg = fmt.Sprintf("awsctrl execution error: %v", err)
 		return
 	}
 	if len(state.Instances) == 0 {
-		state.InfoMsg = "インスタンスが見つかりませんでした"
+		state.InfoMsg = "No instances found"
 	}
 }
 
-// handleExecute は「実行」ボタン押下時の処理を担う
+// handleExecute handles the processing when the "Execute" button is pressed
 func handleExecute(state *ui.AppState) {
 	profile := strings.TrimSpace(state.ProfileEditor.Text())
 	var errs []string
@@ -54,15 +54,15 @@ func handleExecute(state *ui.AppState) {
 		}
 	}
 	if len(errs) > 0 {
-		state.ErrMsg = "実行エラー: " + strings.Join(errs, "; ")
+		state.ErrMsg = "Execution error: " + strings.Join(errs, "; ")
 		state.InfoMsg = ""
 		return
 	}
-	// 成功時: 再取得してステータス更新
+	// On success: refetch and update status
 	if err := refreshInstances(state, profile); err != nil {
-		state.ErrMsg = fmt.Sprintf("再取得エラー: %v", err)
+		state.ErrMsg = fmt.Sprintf("Refetch error: %v", err)
 		return
 	}
-	state.InfoMsg = "実行完了"
+	state.InfoMsg = "Execution complete"
 	state.ErrMsg = ""
 }
