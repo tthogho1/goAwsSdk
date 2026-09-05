@@ -62,7 +62,12 @@ jobs:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
           CGO_ENABLED: ${{ matrix.goos == 'linux' && '1' || '0' }}
-        run: go build -v -o ec2viewer-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }} .
+        run: |
+          if [ "${{ matrix.goos }}" = "windows" ]; then
+            go build -v -ldflags="-H=windowsgui" -o ec2viewer-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }} .
+          else
+            go build -v -o ec2viewer-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }} .
+          fi
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4

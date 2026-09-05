@@ -18,29 +18,29 @@ import (
 	"github.com/atotto/clipboard"
 )
 
-// LayoutTopBar はプロファイル入力欄と「取込」「実行」ボタンを描画
+// LayoutTopBar draws the profile input field and the "Fetch"/"Execute" buttons
 func LayoutTopBar(gtx layout.Context, th *material.Theme, s *AppState) layout.Dimensions {
 	return layout.UniformInset(unit.Dp(4)).Layout(gtx, func(gtx layout.Context) layout.Dimensions {
 		return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
 			layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-				lbl := material.Body1(th, "プロファイル: ")
+				lbl := material.Body1(th, "Profile: ")
 				return lbl.Layout(gtx)
 			}),
 			layout.Flexed(1, func(gtx layout.Context) layout.Dimensions {
-				ed := material.Editor(th, &s.ProfileEditor, "AWSプロファイル名")
+				ed := material.Editor(th, &s.ProfileEditor, "AWS profile name")
 				return layout.UniformInset(unit.Dp(2)).Layout(gtx, func(gtx layout.Context) layout.Dimensions {
 					return ed.Layout(gtx)
 				})
 			}),
 			layout.Rigid(layout.Spacer{Width: unit.Dp(8)}.Layout),
 			layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-				btn := material.Button(th, &s.FetchBtn, "取込")
+				btn := material.Button(th, &s.FetchBtn, "Fetch")
 				btn.Inset = layout.UniformInset(unit.Dp(6))
 				return btn.Layout(gtx)
 			}),
 			layout.Rigid(layout.Spacer{Width: unit.Dp(8)}.Layout),
 			layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-				btn := material.Button(th, &s.ExecuteBtn, "実行")
+				btn := material.Button(th, &s.ExecuteBtn, "Execute")
 				btn.Inset = layout.UniformInset(unit.Dp(6))
 				if !s.HasStatusChanges() {
 					btn.Background = color.NRGBA{R: 180, G: 180, B: 180, A: 255}
@@ -51,7 +51,7 @@ func LayoutTopBar(gtx layout.Context, th *material.Theme, s *AppState) layout.Di
 	})
 }
 
-// LayoutMessage はエラーや情報メッセージを描画
+// LayoutMessage draws an error or informational message
 func LayoutMessage(gtx layout.Context, th *material.Theme, msg string, col color.NRGBA) layout.Dimensions {
 	return layout.UniformInset(unit.Dp(8)).Layout(gtx, func(gtx layout.Context) layout.Dimensions {
 		lbl := material.Body2(th, msg)
@@ -60,7 +60,7 @@ func LayoutMessage(gtx layout.Context, th *material.Theme, msg string, col color
 	})
 }
 
-// LayoutSearchBar はインスタンス名でフィルタする検索欄を描画
+// LayoutSearchBar draws the search field for filtering by instance name
 func LayoutSearchBar(gtx layout.Context, th *material.Theme, s *AppState) layout.Dimensions {
 	return layout.UniformInset(unit.Dp(8)).Layout(gtx, func(gtx layout.Context) layout.Dimensions {
 		return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
@@ -73,11 +73,11 @@ func LayoutSearchBar(gtx layout.Context, th *material.Theme, s *AppState) layout
 	})
 }
 
-// LayoutTable はインスタンス情報をテーブル形式で描画
+// LayoutTable draws the instance information in a table format
 func LayoutTable(gtx layout.Context, th *material.Theme, s *AppState) layout.Dimensions {
 	s.EnsureColVisible()
 
-	// on/off トグルボタンのクリック処理
+	// Handle clicks on the on/off toggle buttons
 	for i := range s.ToggleBtns {
 		for s.ToggleBtns[i].Clicked(gtx) {
 			if i < len(s.DesiredStatus) && i < len(s.OriginalStatus) && s.OriginalStatus[i] != "-" {
@@ -91,7 +91,7 @@ func LayoutTable(gtx layout.Context, th *material.Theme, s *AppState) layout.Dim
 		}
 	}
 
-	// セルクリック (クリップボードへコピー) の処理
+	// Handle cell clicks (copy to clipboard)
 	cols := len(Headers)
 	for i := range s.CellClickables {
 		for s.CellClickables[i].Clicked(gtx) {
@@ -125,12 +125,12 @@ func LayoutTable(gtx layout.Context, th *material.Theme, s *AppState) layout.Dim
 				txt = ""
 			}
 			if txt == "" {
-				s.ErrMsg = "コピー対象が空です"
+				s.ErrMsg = "Nothing to copy"
 				s.InfoMsg = ""
 				continue
 			}
 			if err := clipboard.WriteAll(txt); err != nil {
-				s.ErrMsg = "クリップボードにコピーできませんでした: " + err.Error()
+				s.ErrMsg = "Failed to copy to clipboard: " + err.Error()
 				s.InfoMsg = ""
 			} else {
 				s.InfoMsg = "Copied: " + txt
@@ -139,17 +139,17 @@ func LayoutTable(gtx layout.Context, th *material.Theme, s *AppState) layout.Dim
 		}
 	}
 
-	// ヘッダーステータスボタンのクリックでメニュー開閉
+	// Toggle the menu open/closed when the header status button is clicked
 	for s.HeaderStatusBtn.Clicked(gtx) {
 		s.HeaderStatusMenuOpen = !s.HeaderStatusMenuOpen
 		s.logDebugf("headerStatusBtn clicked; menu open: %t", s.HeaderStatusMenuOpen)
 	}
 
-	// 列表示メニューボタンのクリックで開閉
+	// Toggle the column visibility menu open/closed when clicked
 	for s.ColMenuBtn.Clicked(gtx) {
 		s.ColMenuOpen = !s.ColMenuOpen
 	}
-	// 列表示メニュー項目のクリックで表示/非表示を切替 (ID列は必須のため除外)
+	// Toggle column visibility when a column-visibility menu item is clicked (the ID column is excluded since it's required)
 	for i := range s.ColMenuItems {
 		for s.ColMenuItems[i].Clicked(gtx) {
 			if i == 0 {
@@ -159,7 +159,7 @@ func LayoutTable(gtx layout.Context, th *material.Theme, s *AppState) layout.Dim
 		}
 	}
 
-	// 必要に応じて表示インデックスを再計算
+	// Recompute visible indices if necessary
 	if s.VisibleDirty {
 		s.VisibleIndices = s.VisibleIndices[:0]
 		for i := range s.Instances {
@@ -176,7 +176,7 @@ func LayoutTable(gtx layout.Context, th *material.Theme, s *AppState) layout.Dim
 					match = model.MapStatus(s.Instances[i].Status) == "-"
 				}
 			}
-			// 名前検索フィルタを適用
+			// Apply the name search filter
 			if match && s.SearchQuery != "" {
 				name := strings.ToLower(s.Instances[i].Name)
 				if !strings.Contains(name, strings.ToLower(s.SearchQuery)) {
@@ -191,10 +191,10 @@ func LayoutTable(gtx layout.Context, th *material.Theme, s *AppState) layout.Dim
 		s.logDebugf("Recomputed visibleIndices; filter=%s count=%d menuOpen=%t", s.HeaderStatusFilter, len(s.VisibleIndices), s.HeaderStatusMenuOpen)
 	}
 
-	// フレックス子要素: ヘッダー + オプショナルメニュー + データ行
+	// Flex children: header + optional menu + data rows
 	var flexChildren []layout.FlexChild
 
-	// ヘッダー行
+	// Header row
 	flexChildren = append(flexChildren, layout.Rigid(func(gtx layout.Context) layout.Dimensions {
 		return drawRowBackground(gtx, color.NRGBA{R: 220, G: 220, B: 240, A: 255}, func(gtx layout.Context) layout.Dimensions {
 			return layout.UniformInset(unit.Dp(4)).Layout(gtx, func(gtx layout.Context) layout.Dimensions {
@@ -232,8 +232,8 @@ func LayoutTable(gtx layout.Context, th *material.Theme, s *AppState) layout.Dim
 				children = append(children, layout.Rigid(layout.Spacer{Width: unit.Dp(8)}.Layout))
 				children = append(children, layout.Rigid(func(gtx layout.Context) layout.Dimensions {
 					return s.ColMenuBtn.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
-						// ASCII のみ使用 (▾ 等の記号はフォールバックフォントで行高が肥大化する)
-						lbl := material.Body2(th, "列表示 v")
+						// Use ASCII only (symbols like ▾ inflate row height via fallback font)
+						lbl := material.Body2(th, "Columns v")
 						lbl.Font.Weight = font.Bold
 						lbl.MaxLines = 1
 						return lbl.Layout(gtx)
@@ -244,7 +244,7 @@ func LayoutTable(gtx layout.Context, th *material.Theme, s *AppState) layout.Dim
 		})
 	}))
 
-	// 列表示切替メニュー
+	// Column visibility toggle menu
 	if s.ColMenuOpen {
 		flexChildren = append(flexChildren, layout.Rigid(func(gtx layout.Context) layout.Dimensions {
 			return drawRowBackground(gtx, color.NRGBA{R: 245, G: 245, B: 245, A: 255}, func(gtx layout.Context) layout.Dimensions {
@@ -275,7 +275,7 @@ func LayoutTable(gtx layout.Context, th *material.Theme, s *AppState) layout.Dim
 		}))
 	}
 
-	// セレクタメニュー (リストの外側)
+	// Selector menu (outside the list)
 	if s.HeaderStatusMenuOpen {
 		flexChildren = append(flexChildren, layout.Rigid(func(gtx layout.Context) layout.Dimensions {
 			return drawRowBackground(gtx, color.NRGBA{R: 245, G: 245, B: 245, A: 255}, func(gtx layout.Context) layout.Dimensions {
@@ -330,7 +330,7 @@ func LayoutTable(gtx layout.Context, th *material.Theme, s *AppState) layout.Dim
 			})
 		}))
 
-		// メニューボタンのクリック処理
+		// Handle menu button clicks
 		for s.HeaderMenuAll.Clicked(gtx) {
 			s.HeaderStatusFilter = ""
 			s.HeaderStatusMenuOpen = false
@@ -357,11 +357,11 @@ func LayoutTable(gtx layout.Context, th *material.Theme, s *AppState) layout.Dim
 		}
 	}
 
-	// データ行
+	// Data rows
 	flexChildren = append(flexChildren, layout.Flexed(1, func(gtx layout.Context) layout.Dimensions {
 		return material.List(th, &s.TableList).Layout(gtx, len(s.VisibleIndices), func(gtx layout.Context, idx int) layout.Dimensions {
 			actualIdx := s.VisibleIndices[idx]
-			// ゼブラ縞の背景
+			// Zebra-stripe background
 			bg := color.NRGBA{R: 255, G: 255, B: 255, A: 255}
 			if idx%2 == 0 {
 				bg = color.NRGBA{R: 245, G: 245, B: 245, A: 255}
@@ -394,7 +394,7 @@ func LayoutTable(gtx layout.Context, th *material.Theme, s *AppState) layout.Dim
 								lbl.MaxLines = 1
 								return lbl.Layout(gtx)
 							}
-							// 最終カラム: トグル + コピー
+							// Final column: toggle + copy
 							if cellIdx == 6 && actualIdx < len(s.ToggleBtns) {
 								return s.CellClickables[clickIdx].Layout(gtx, func(gtx layout.Context) layout.Dimensions {
 									return s.ToggleBtns[actualIdx].Layout(gtx, func(gtx layout.Context) layout.Dimensions {
@@ -413,7 +413,7 @@ func LayoutTable(gtx layout.Context, th *material.Theme, s *AppState) layout.Dim
 									})
 								})
 							}
-							// その他カラム: コピー用クリッカブルでラップ
+							// Other columns: wrap with a clickable for copying
 							return s.CellClickables[clickIdx].Layout(gtx, func(gtx layout.Context) layout.Dimensions {
 								lbl := material.Body2(th, cellText)
 								lbl.MaxLines = 1
@@ -427,7 +427,7 @@ func LayoutTable(gtx layout.Context, th *material.Theme, s *AppState) layout.Dim
 		})
 	}))
 
-	// テーブルを水平方向に中央揃え (非表示列は幅計算から除外)
+	// Center the table horizontally (hidden columns are excluded from the width calculation)
 	tableWidth := 0
 	for i, w := range ColWidths {
 		if !s.ColVisible[i] {
@@ -454,13 +454,13 @@ func LayoutTable(gtx layout.Context, th *material.Theme, s *AppState) layout.Dim
 	return layout.Flex{Axis: layout.Vertical}.Layout(gtx, flexChildren...)
 }
 
-// LayoutFooter はインスタンス件数とヒントを表示するフッターを描画
+// LayoutFooter draws the footer showing the instance count and hints
 func LayoutFooter(gtx layout.Context, th *material.Theme, s *AppState) layout.Dimensions {
 	return drawRowBackground(gtx, color.NRGBA{R: 220, G: 220, B: 240, A: 255}, func(gtx layout.Context) layout.Dimensions {
 		return layout.UniformInset(unit.Dp(6)).Layout(gtx, func(gtx layout.Context) layout.Dimensions {
 			total := len(s.Instances)
 			visible := len(s.VisibleIndices)
-			countText := fmt.Sprintf("表示中: %d / 全%d件", visible, total)
+			countText := fmt.Sprintf("Showing: %d / %d total", visible, total)
 			return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
 				layout.Rigid(func(gtx layout.Context) layout.Dimensions {
 					lbl := material.Body2(th, countText)
@@ -468,7 +468,7 @@ func LayoutFooter(gtx layout.Context, th *material.Theme, s *AppState) layout.Di
 				}),
 				layout.Flexed(1, layout.Spacer{}.Layout),
 				layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-					lbl := material.Body2(th, "セルクリックでクリップボードにコピー")
+					lbl := material.Body2(th, "Click a cell to copy to clipboard")
 					lbl.Color = color.NRGBA{R: 100, G: 100, B: 100, A: 255}
 					return lbl.Layout(gtx)
 				}),
@@ -477,7 +477,7 @@ func LayoutFooter(gtx layout.Context, th *material.Theme, s *AppState) layout.Di
 	})
 }
 
-// drawRowBackground は行の背景色を描画する
+// drawRowBackground draws the background color of a row
 func drawRowBackground(gtx layout.Context, col color.NRGBA, w layout.Widget) layout.Dimensions {
 	return layout.Stack{}.Layout(gtx,
 		layout.Expanded(func(gtx layout.Context) layout.Dimensions {

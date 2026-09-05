@@ -6,7 +6,7 @@ import (
 	"ec2viewer/model"
 )
 
-// parseOutput は awsctrl の出力テキストをパースしてインスタンス情報に変換する
+// parseOutput parses the awsctrl output text and converts it into instance information
 func parseOutput(output string) []model.Instance {
 	var result []model.Instance
 	lines := strings.Split(output, "\n")
@@ -23,8 +23,8 @@ func parseOutput(output string) []model.Instance {
 	return result
 }
 
-// parseInstanceLine は1行のインスタンス情報をパースする
-// 入力形式: "ID: <id>,  <status>, <type>, <privateIP>, <publicIP>  <TagKey>: <TagVal>  ..."
+// parseInstanceLine parses a single line of instance information
+// Input format: "ID: <id>,  <status>, <type>, <privateIP>, <publicIP>  <TagKey>: <TagVal>  ..."
 func parseInstanceLine(line string) model.Instance {
 	line = strings.TrimPrefix(line, "ID: ")
 
@@ -42,7 +42,7 @@ func parseInstanceLine(line string) model.Instance {
 	publicIP := lastPart
 	name := ""
 
-	// publicIP 以降のタグ部分を分離（タグは "  " で区切られている）
+	// Separate the tag portion after publicIP (tags are delimited by "  ")
 	tagIdx := strings.Index(lastPart, "  ")
 	if tagIdx >= 0 {
 		publicIP = strings.TrimSpace(lastPart[:tagIdx])

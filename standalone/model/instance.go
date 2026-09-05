@@ -1,6 +1,6 @@
 package model
 
-// Instance はEC2インスタンス情報を保持する構造体
+// Instance is a struct that holds EC2 instance information
 type Instance struct {
 	ID           string
 	Status       string
@@ -10,7 +10,7 @@ type Instance struct {
 	Name         string
 }
 
-// MapStatus はAWSステータスをon/off/-に変換する
+// MapStatus converts an AWS status into on/off/-
 func MapStatus(awsStatus string) string {
 	switch awsStatus {
 	case "running":

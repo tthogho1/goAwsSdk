@@ -45,13 +45,13 @@ func main() {
 		_ = logger.Sync()
 	}()
 
-	// .env 読み込み
-	if err := loadEnv(".env"); err != nil {
-		fmt.Fprintf(os.Stderr, ".envファイル読み込みエラー: %v\n", err)
+	// Load .env (prefer the directory next to the executable)
+	if err := loadEnv(envFilePath()); err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to load .env file: %v\n", err)
 		os.Exit(1)
 	}
 	if awsctrlPath == "" {
-		fmt.Fprintln(os.Stderr, "AWSCTRL_PATH が .env に設定されていません")
+		fmt.Fprintln(os.Stderr, "AWSCTRL_PATH is not set in .env")
 		os.Exit(1)
 	}
 
@@ -73,7 +73,7 @@ func main() {
 	app.Main()
 }
 
-// run はウィンドウのイベントループ
+// run is the window event loop
 func run(w *app.Window, state *ui.AppState) error {
 	th := material.NewTheme()
 	var ops op.Ops
@@ -85,25 +85,25 @@ func run(w *app.Window, state *ui.AppState) error {
 		case app.FrameEvent:
 			gtx := app.NewContext(&ops, e)
 
-			// 「取込」ボタン押下処理
+			// Handle "Fetch" button press
 			if state.FetchBtn.Clicked(gtx) {
 				handleFetch(state)
 			}
 
-			// 「実行」ボタン押下処理
+			// Handle "Execute" button press
 			if state.ExecuteBtn.Clicked(gtx) && state.HasStatusChanges() {
 				handleExecute(state)
 			}
 
-				// update search query each frame; mark dirty when changed
-				newQuery := strings.TrimSpace(state.SearchEditor.Text())
-				if newQuery != state.SearchQuery {
-					state.SearchQuery = newQuery
-					state.VisibleDirty = true
-				}
-				// search is live; editing `SearchEditor` already marks `VisibleDirty`
+			// update search query each frame; mark dirty when changed
+			newQuery := strings.TrimSpace(state.SearchEditor.Text())
+			if newQuery != state.SearchQuery {
+				state.SearchQuery = newQuery
+				state.VisibleDirty = true
+			}
+			// search is live; editing `SearchEditor` already marks `VisibleDirty`
 
-				// メインレイアウト: 上部バー + メッセージ + テーブル
+			// Main layout: top bar + message + table
 			layout.Flex{Axis: layout.Vertical}.Layout(gtx,
 				layout.Rigid(func(gtx layout.Context) layout.Dimensions {
 					return ui.LayoutTopBar(gtx, th, state)
@@ -149,4 +149,3 @@ func initLogger(path string) (*os.File, *zap.Logger, *zap.SugaredLogger, error) 
 	s := lg.Sugar()
 	return f, lg, s, nil
 }
-
