@@ -17,6 +17,7 @@ import (
 	"gioui.org/layout"
 	"gioui.org/op"
 	"gioui.org/unit"
+	"gioui.org/widget"
 	"gioui.org/widget/material"
 )
 
@@ -64,8 +65,11 @@ func main() {
 	}
 
 	state := &ui.AppState{Logger: sugar}
-	state.ProfileEditor.SetText("default")
-	state.ProfileEditor.SingleLine = true
+	state.Profiles = loadAwsProfiles()
+	state.ProfileMenuItems = make([]widget.Clickable, len(state.Profiles))
+	if len(state.Profiles) > 0 {
+		state.SelectedProfile = state.Profiles[0]
+	}
 	state.TableList.Axis = layout.Vertical
 
 	go func() {

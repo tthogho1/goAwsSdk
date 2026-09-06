@@ -20,9 +20,9 @@ func refreshInstances(state *ui.AppState, profile string) error {
 
 // handleFetch handles the processing when the "Fetch" button is pressed
 func handleFetch(state *ui.AppState) {
-	profile := strings.TrimSpace(state.ProfileEditor.Text())
+	profile := strings.TrimSpace(state.SelectedProfile)
 	if profile == "" {
-		state.ErrMsg = "Please enter a profile"
+		state.ErrMsg = "Please select a profile"
 		state.InfoMsg = ""
 		return
 	}
@@ -39,7 +39,7 @@ func handleFetch(state *ui.AppState) {
 
 // handleExecute handles the processing when the "Execute" button is pressed
 func handleExecute(state *ui.AppState) {
-	profile := strings.TrimSpace(state.ProfileEditor.Text())
+	profile := strings.TrimSpace(state.SelectedProfile)
 	var errs []string
 	for i := range state.Instances {
 		if state.DesiredStatus[i] == state.OriginalStatus[i] || state.OriginalStatus[i] == "-" {
