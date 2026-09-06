@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"image/color"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"go.uber.org/zap"
@@ -16,6 +17,7 @@ import (
 	"gioui.org/layout"
 	"gioui.org/op"
 	"gioui.org/unit"
+	"gioui.org/widget"
 	"gioui.org/widget/material"
 )
 
@@ -25,14 +27,21 @@ var (
 )
 
 func main() {
-	// CLI: allow setting logfile path (default: ./app.log)
-	flag.StringVar(&logPath, "logfile", "", "log file path (default: ./app.log)")
+	// CLI: allow setting logfile path (default: <exe dir>/app.log)
+	flag.StringVar(&logPath, "logfile", "", "log file path (default: app.log next to the executable)")
 	flag.Parse()
 	if logPath == "" {
-		logPath = "./app.log"
+		logPath = filepath.Join(exeDir(), "app.log")
 	}
-	// initialize logger
+	// initialize logger; if that fails (e.g. read-only location), fall back to a temp file
 	f, lg, s, err := initLogger(logPath)
+	if err != nil {
+		if tmpPath := filepath.Join(os.TempDir(), "ec2viewer_app.log"); tmpPath != logPath {
+			if f2, lg2, s2, err2 := initLogger(tmpPath); err2 == nil {
+				f, lg, s, err = f2, lg2, s2, nil
+			}
+		}
+	}
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "cannot initialize logger %s: %v\n", logPath, err)
 		os.Exit(1)
@@ -56,8 +65,11 @@ func main() {
 	}
 
 	state := &ui.AppState{Logger: sugar}
-	state.ProfileEditor.SetText("default")
-	state.ProfileEditor.SingleLine = true
+	state.Profiles = loadAwsProfiles()
+	state.ProfileMenuItems = make([]widget.Clickable, len(state.Profiles))
+	if len(state.Profiles) > 0 {
+		state.SelectedProfile = state.Profiles[0]
+	}
 	state.TableList.Axis = layout.Vertical
 
 	go func() {

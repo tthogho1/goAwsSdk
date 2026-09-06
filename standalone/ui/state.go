@@ -29,12 +29,18 @@ type AppState struct {
 	VisibleDirty   bool
 
 	// UI widgets
-	ProfileEditor widget.Editor
-	SearchEditor  widget.Editor
-	SearchQuery   string
-	FetchBtn      widget.Clickable
-	ExecuteBtn    widget.Clickable
-	TableList     widget.List
+	SearchEditor widget.Editor
+	SearchQuery  string
+	FetchBtn     widget.Clickable
+	ExecuteBtn   widget.Clickable
+	TableList    widget.List
+
+	// Profile selection menu
+	Profiles         []string
+	SelectedProfile  string
+	ProfileMenuOpen  bool
+	ProfileMenuBtn   widget.Clickable
+	ProfileMenuItems []widget.Clickable
 
 	// Messages
 	ErrMsg  string

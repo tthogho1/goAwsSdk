@@ -20,35 +20,86 @@ import (
 
 // LayoutTopBar draws the profile input field and the "Fetch"/"Execute" buttons
 func LayoutTopBar(gtx layout.Context, th *material.Theme, s *AppState) layout.Dimensions {
-	return layout.UniformInset(unit.Dp(4)).Layout(gtx, func(gtx layout.Context) layout.Dimensions {
-		return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
-			layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-				lbl := material.Body1(th, "Profile: ")
-				return lbl.Layout(gtx)
-			}),
-			layout.Flexed(1, func(gtx layout.Context) layout.Dimensions {
-				ed := material.Editor(th, &s.ProfileEditor, "AWS profile name")
-				return layout.UniformInset(unit.Dp(2)).Layout(gtx, func(gtx layout.Context) layout.Dimensions {
-					return ed.Layout(gtx)
+	// Toggle the profile menu open/closed when the profile button is clicked
+	for s.ProfileMenuBtn.Clicked(gtx) {
+		s.ProfileMenuOpen = !s.ProfileMenuOpen
+	}
+	// Handle profile selection from the menu
+	for i := range s.ProfileMenuItems {
+		for s.ProfileMenuItems[i].Clicked(gtx) {
+			if i < len(s.Profiles) {
+				s.SelectedProfile = s.Profiles[i]
+			}
+			s.ProfileMenuOpen = false
+		}
+	}
+
+	return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
+		layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+			return layout.UniformInset(unit.Dp(4)).Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+				return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
+					layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+						lbl := material.Body1(th, "Profile: ")
+						return lbl.Layout(gtx)
+					}),
+					layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+						return s.ProfileMenuBtn.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+							text := s.SelectedProfile
+							if text == "" {
+								text = "(select profile)"
+							}
+							lbl := material.Body1(th, text+" v")
+							return layout.UniformInset(unit.Dp(6)).Layout(gtx, lbl.Layout)
+						})
+					}),
+					layout.Flexed(1, func(gtx layout.Context) layout.Dimensions {
+						return layout.Dimensions{Size: image.Point{X: gtx.Constraints.Max.X, Y: gtx.Constraints.Min.Y}}
+					}),
+					layout.Rigid(layout.Spacer{Width: unit.Dp(8)}.Layout),
+					layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+						btn := material.Button(th, &s.FetchBtn, "Fetch")
+						btn.Inset = layout.UniformInset(unit.Dp(6))
+						return btn.Layout(gtx)
+					}),
+					layout.Rigid(layout.Spacer{Width: unit.Dp(8)}.Layout),
+					layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+						btn := material.Button(th, &s.ExecuteBtn, "Execute")
+						btn.Inset = layout.UniformInset(unit.Dp(6))
+						if !s.HasStatusChanges() {
+							btn.Background = color.NRGBA{R: 180, G: 180, B: 180, A: 255}
+						}
+						return btn.Layout(gtx)
+					}),
+				)
+			})
+		}),
+		layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+			if !s.ProfileMenuOpen {
+				return layout.Dimensions{}
+			}
+			return drawRowBackground(gtx, color.NRGBA{R: 245, G: 245, B: 245, A: 255}, func(gtx layout.Context) layout.Dimensions {
+				return layout.UniformInset(unit.Dp(4)).Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+					var children []layout.FlexChild
+					for i, p := range s.Profiles {
+						idx := i
+						name := p
+						children = append(children, layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+							return s.ProfileMenuItems[idx].Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+								lbl := material.Body2(th, name)
+								if name == s.SelectedProfile {
+									lbl.Color = color.NRGBA{R: 0, G: 80, B: 160, A: 255}
+									lbl.Font.Weight = font.Bold
+								}
+								lbl.MaxLines = 1
+								return layout.UniformInset(unit.Dp(4)).Layout(gtx, lbl.Layout)
+							})
+						}))
+					}
+					return layout.Flex{Axis: layout.Vertical}.Layout(gtx, children...)
 				})
-			}),
-			layout.Rigid(layout.Spacer{Width: unit.Dp(8)}.Layout),
-			layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-				btn := material.Button(th, &s.FetchBtn, "Fetch")
-				btn.Inset = layout.UniformInset(unit.Dp(6))
-				return btn.Layout(gtx)
-			}),
-			layout.Rigid(layout.Spacer{Width: unit.Dp(8)}.Layout),
-			layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-				btn := material.Button(th, &s.ExecuteBtn, "Execute")
-				btn.Inset = layout.UniformInset(unit.Dp(6))
-				if !s.HasStatusChanges() {
-					btn.Background = color.NRGBA{R: 180, G: 180, B: 180, A: 255}
-				}
-				return btn.Layout(gtx)
-			}),
-		)
-	})
+			})
+		}),
+	)
 }
 
 // LayoutMessage draws an error or informational message

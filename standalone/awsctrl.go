@@ -9,6 +9,20 @@ import (
 	"github.com/joho/godotenv"
 )
 
+// exeDir returns the directory containing the running executable,
+// resolving symlinks in case the app was launched via a symlink
+// (e.g. a Desktop shortcut). Falls back to "." on error.
+func exeDir() string {
+	exePath, err := os.Executable()
+	if err != nil {
+		return "."
+	}
+	if resolved, err := filepath.EvalSymlinks(exePath); err == nil {
+		exePath = resolved
+	}
+	return filepath.Dir(exePath)
+}
+
 // envFilePath determines the search path for the .env file.
 // It prefers .env in the current directory if present, otherwise it
 // looks in the directory where the executable itself resides
@@ -17,15 +31,7 @@ func envFilePath() string {
 	if _, err := os.Stat(".env"); err == nil {
 		return ".env"
 	}
-
-	exePath, err := os.Executable()
-	if err != nil {
-		return ".env"
-	}
-	if resolved, err := filepath.EvalSymlinks(exePath); err == nil {
-		exePath = resolved
-	}
-	return filepath.Join(filepath.Dir(exePath), ".env")
+	return filepath.Join(exeDir(), ".env")
 }
 
 // loadEnv loads settings from the .env file

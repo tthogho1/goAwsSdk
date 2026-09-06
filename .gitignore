@@ -7,6 +7,14 @@
 # Ignore built Go binaries
 /awsctrl
 /standalone/ec2viewer
+/sample-s3-list/s3-list
+/sample-s3-upload/s3-folder-upload
+
+# Ignore machine-specific env config
+/standalone/.env
+
+# Ignore macOS app bundle (built locally, contains machine-specific config)
+/standalone/EC2Viewer.app/
 
 # Ignore zip files
 *.zip
