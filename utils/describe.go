@@ -4,6 +4,7 @@ package utils
 import (
 	"fmt"
 	"log"
+	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/apprunner"
@@ -31,7 +32,17 @@ func Describe(svc *ec2.EC2, pattern *string) {
 			}
 
 			privateIp := "None"
-			if instance.PrivateIpAddress != nil {
+			var ips []string
+			for _, ni := range instance.NetworkInterfaces {
+				for _, addr := range ni.PrivateIpAddresses {
+					if addr.PrivateIpAddress != nil {
+						ips = append(ips, *addr.PrivateIpAddress)
+					}
+				}
+			}
+			if len(ips) > 0 {
+				privateIp = strings.Join(ips, ";")
+			} else if instance.PrivateIpAddress != nil {
 				privateIp = *instance.PrivateIpAddress
 			}
 
@@ -171,5 +182,71 @@ func DescribeSecurityGroup(svc *ec2.EC2, groupID *string) {
 
 	for _, group := range res.SecurityGroups {
 		fmt.Println(*group.GroupId, *group.GroupName, *group.Description)
+	}
+}
+
+// DescribeInstanceDetail prints detailed information for a single EC2 instance:
+// VPC, Subnet, attached Security Groups and all Tags. Output is formatted as
+// simple "Key: Value" lines so it can be parsed by callers (e.g. Ec2Viewer).
+func DescribeInstanceDetail(svc *ec2.EC2, instanceID *string) {
+	if instanceID == nil || *instanceID == "" {
+		fmt.Println("instance id is required")
+		return
+	}
+
+	params := &ec2.DescribeInstancesInput{
+		InstanceIds: []*string{aws.String(*instanceID)},
+	}
+
+	result, err := svc.DescribeInstances(params)
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+
+	for _, reservation := range result.Reservations {
+		for _, instance := range reservation.Instances {
+			id := "None"
+			if instance.InstanceId != nil {
+				id = *instance.InstanceId
+			}
+			fmt.Printf("InstanceId: %s\n", id)
+
+			vpcID := "None"
+			if instance.VpcId != nil {
+				vpcID = *instance.VpcId
+			}
+			fmt.Printf("VpcId: %s\n", vpcID)
+
+			subnetID := "None"
+			if instance.SubnetId != nil {
+				subnetID = *instance.SubnetId
+			}
+			fmt.Printf("SubnetId: %s\n", subnetID)
+
+			for _, sg := range instance.SecurityGroups {
+				groupID := "None"
+				if sg.GroupId != nil {
+					groupID = *sg.GroupId
+				}
+				groupName := "None"
+				if sg.GroupName != nil {
+					groupName = *sg.GroupName
+				}
+				fmt.Printf("SecurityGroup: %s (%s)\n", groupID, groupName)
+			}
+
+			for _, tag := range instance.Tags {
+				key := ""
+				val := ""
+				if tag.Key != nil {
+					key = *tag.Key
+				}
+				if tag.Value != nil {
+					val = *tag.Value
+				}
+				fmt.Printf("Tag: %s=%s\n", key, val)
+			}
+		}
 	}
 }

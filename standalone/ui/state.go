@@ -13,7 +13,7 @@ import (
 var Headers = []string{"ID", "Status", "Type", "PrivateIP", "PublicIP", "Name", "on/off"}
 
 // ColWidths are the widths of each table column
-var ColWidths = []unit.Dp{180, 80, 100, 130, 130, 160, 60}
+var ColWidths = []unit.Dp{180, 80, 100, 220, 130, 160, 60}
 
 // AppState is a struct that centrally manages the UI and data state
 type AppState struct {
@@ -53,6 +53,15 @@ type AppState struct {
 	CostEntries   []model.CostEntry
 	CostTotal     float64
 	CostPeriod    string
+
+	// Instance detail panel (opened by clicking the ID cell of a row)
+	DetailPanelOpen bool
+	DetailCloseBtn  widget.Clickable
+	Detail          model.InstanceDetail
+	DetailErr       string
+	// OnRowDetail is invoked with the instance ID when the ID cell of a row
+	// is clicked, so the caller (main package) can fetch instance details.
+	OnRowDetail func(instanceID string)
 
 	// Header status filter menu
 	HeaderStatusBtn      widget.Clickable
