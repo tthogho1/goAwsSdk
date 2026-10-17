@@ -54,7 +54,7 @@ jobs:
         if: matrix.goos == 'linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgl1-mesa-dev libx11-dev libxcursor-dev libxfixes-dev libxrandr-dev libxinerama-dev libwayland-dev libvulkan-dev
+          sudo apt-get install -y libgl1-mesa-dev libx11-dev libxcursor-dev libxfixes-dev libxrandr-dev libxinerama-dev libwayland-dev libvulkan-dev libxkbcommon-dev libxkbcommon-x11-dev libx11-xcb-dev libegl1-mesa-dev pkg-config
 
       - name: Build
         working-directory: standalone
