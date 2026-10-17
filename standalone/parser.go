@@ -107,3 +107,40 @@ func parseCostOutput(output string) ([]model.CostEntry, float64) {
 	}
 	return entries, total
 }
+
+// parseInstanceDetail parses the output of "awsctrl -c detail -t EC2 -i ..."
+// into an InstanceDetail. Expected lines look like:
+//
+//	InstanceId: i-0123456789abcdef0
+//	VpcId: vpc-xxxx
+//	SubnetId: subnet-xxxx
+//	SecurityGroup: sg-xxxx (web-sg)
+//	Tag: Name=myserver
+func parseInstanceDetail(output string) model.InstanceDetail {
+	var detail model.InstanceDetail
+
+	lines := strings.Split(output, "\n")
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		switch {
+		case strings.HasPrefix(trimmed, "InstanceId:"):
+			detail.InstanceId = strings.TrimSpace(strings.TrimPrefix(trimmed, "InstanceId:"))
+		case strings.HasPrefix(trimmed, "VpcId:"):
+			detail.VpcId = strings.TrimSpace(strings.TrimPrefix(trimmed, "VpcId:"))
+		case strings.HasPrefix(trimmed, "SubnetId:"):
+			detail.SubnetId = strings.TrimSpace(strings.TrimPrefix(trimmed, "SubnetId:"))
+		case strings.HasPrefix(trimmed, "SecurityGroup:"):
+			sg := strings.TrimSpace(strings.TrimPrefix(trimmed, "SecurityGroup:"))
+			if sg != "" {
+				detail.SecurityGroups = append(detail.SecurityGroups, sg)
+			}
+		case strings.HasPrefix(trimmed, "Tag:"):
+			kv := strings.TrimSpace(strings.TrimPrefix(trimmed, "Tag:"))
+			parts := strings.SplitN(kv, "=", 2)
+			if len(parts) == 2 {
+				detail.Tags = append(detail.Tags, model.Tag{Key: parts[0], Value: parts[1]})
+			}
+		}
+	}
+	return detail
+}

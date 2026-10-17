@@ -162,12 +162,15 @@ func LayoutTable(gtx layout.Context, th *material.Theme, s *AppState) layout.Dim
 			switch colIdx {
 			case 0:
 				txt = inst.ID
+				if s.OnRowDetail != nil {
+					s.OnRowDetail(inst.ID)
+				}
 			case 1:
 				txt = inst.Status
 			case 2:
 				txt = inst.InstanceType
 			case 3:
-				txt = inst.PrivateIP
+				txt = inst.DisplayPrivateIP()
 			case 4:
 				txt = inst.PublicIP
 			case 5:
@@ -433,7 +436,7 @@ func LayoutTable(gtx layout.Context, th *material.Theme, s *AppState) layout.Dim
 							statusDisplay += "*"
 						}
 					}
-					cells := []string{inst.ID, inst.Status, inst.InstanceType, inst.PrivateIP, inst.PublicIP, inst.Name, statusDisplay}
+					cells := []string{inst.ID, inst.Status, inst.InstanceType, inst.DisplayPrivateIP(), inst.PublicIP, inst.Name, statusDisplay}
 					var children []layout.FlexChild
 					for i, cell := range cells {
 						if !s.ColVisible[i] {
@@ -591,6 +594,100 @@ func LayoutCostPanel(gtx layout.Context, th *material.Theme, s *AppState) layout
 				lbl.Font.Weight = font.Bold
 				return lbl.Layout(gtx)
 			}))
+
+			return layout.Flex{Axis: layout.Vertical}.Layout(gtx, children...)
+		})
+	})
+}
+
+// LayoutDetailPanel draws a panel showing VPC/Subnet/SecurityGroup/Tag
+// details for the instance selected via OnRowDetail (ID cell click).
+func LayoutDetailPanel(gtx layout.Context, th *material.Theme, s *AppState) layout.Dimensions {
+	if !s.DetailPanelOpen {
+		return layout.Dimensions{}
+	}
+	for s.DetailCloseBtn.Clicked(gtx) {
+		s.DetailPanelOpen = false
+	}
+	return drawRowBackground(gtx, color.NRGBA{R: 235, G: 245, B: 250, A: 255}, func(gtx layout.Context) layout.Dimensions {
+		return layout.UniformInset(unit.Dp(8)).Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+			var children []layout.FlexChild
+
+			children = append(children, layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+				return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
+					layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+						title := "Instance Detail"
+						if s.Detail.InstanceId != "" {
+							title = title + ": " + s.Detail.InstanceId
+						}
+						lbl := material.Body1(th, title)
+						lbl.Font.Weight = font.Bold
+						return lbl.Layout(gtx)
+					}),
+					layout.Flexed(1, layout.Spacer{}.Layout),
+					layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+						btn := material.Button(th, &s.DetailCloseBtn, "Close")
+						btn.Inset = layout.UniformInset(unit.Dp(4))
+						return btn.Layout(gtx)
+					}),
+				)
+			}))
+
+			if s.DetailErr != "" {
+				errText := s.DetailErr
+				children = append(children, layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+					lbl := material.Body2(th, errText)
+					lbl.Color = color.NRGBA{R: 220, G: 50, B: 50, A: 255}
+					return lbl.Layout(gtx)
+				}))
+				return layout.Flex{Axis: layout.Vertical}.Layout(gtx, children...)
+			}
+
+			addRow := func(label, value string) {
+				children = append(children, layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+					return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
+						layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+							gtx.Constraints.Min.X = gtx.Dp(unit.Dp(120))
+							lbl := material.Body2(th, label)
+							lbl.Font.Weight = font.Bold
+							lbl.MaxLines = 1
+							return lbl.Layout(gtx)
+						}),
+						layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+							lbl := material.Body2(th, value)
+							lbl.MaxLines = 1
+							return lbl.Layout(gtx)
+						}),
+					)
+				}))
+			}
+
+			addRow("VPC:", s.Detail.VpcId)
+			addRow("Subnet:", s.Detail.SubnetId)
+
+			if len(s.Detail.SecurityGroups) == 0 {
+				addRow("Security Groups:", "(none)")
+			} else {
+				for i, sg := range s.Detail.SecurityGroups {
+					label := "Security Groups:"
+					if i > 0 {
+						label = ""
+					}
+					addRow(label, sg)
+				}
+			}
+
+			if len(s.Detail.Tags) == 0 {
+				addRow("Tags:", "(none)")
+			} else {
+				for i, tag := range s.Detail.Tags {
+					label := "Tags:"
+					if i > 0 {
+						label = ""
+					}
+					addRow(label, tag.Key+" = "+tag.Value)
+				}
+			}
 
 			return layout.Flex{Axis: layout.Vertical}.Layout(gtx, children...)
 		})

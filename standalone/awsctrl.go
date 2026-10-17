@@ -76,3 +76,16 @@ func executeAwsCtrlCost(profile, start, end string) (string, error) {
 	}
 	return string(out), nil
 }
+
+// executeAwsCtrlDetail runs the "detail" subcommand of awsctrl to fetch
+// VPC/Subnet/SecurityGroup/Tag information for a single EC2 instance.
+func executeAwsCtrlDetail(profile, instanceID string) (string, error) {
+	cmd := exec.Command(awsctrlPath, "-profile", profile, "-c", "detail", "-t", "EC2", "-i", instanceID)
+	setHideWindow(cmd)
+
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("%v\n%s", err, string(out))
+	}
+	return string(out), nil
+}

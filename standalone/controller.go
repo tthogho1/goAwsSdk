@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"ec2viewer/model"
 	"ec2viewer/ui"
 )
 
@@ -104,4 +105,30 @@ func handleCost(state *ui.AppState) {
 	} else {
 		state.InfoMsg = ""
 	}
+}
+
+// handleDetail handles fetching and displaying details (VPC, Subnet,
+// Security Groups, Tags) for a single EC2 instance.
+func handleDetail(state *ui.AppState, instanceID string) {
+	profile := strings.TrimSpace(state.SelectedProfile)
+	if profile == "" {
+		state.ErrMsg = "Please select a profile"
+		state.InfoMsg = ""
+		return
+	}
+	if instanceID == "" {
+		return
+	}
+
+	output, err := executeAwsCtrlDetail(profile, instanceID)
+	if err != nil {
+		state.DetailErr = fmt.Sprintf("detail fetch error: %v", err)
+		state.Detail = model.InstanceDetail{}
+		state.DetailPanelOpen = true
+		return
+	}
+
+	state.Detail = parseInstanceDetail(output)
+	state.DetailErr = ""
+	state.DetailPanelOpen = true
 }

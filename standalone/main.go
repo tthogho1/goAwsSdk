@@ -71,6 +71,9 @@ func main() {
 		state.SelectedProfile = state.Profiles[0]
 	}
 	state.TableList.Axis = layout.Vertical
+	state.OnRowDetail = func(instanceID string) {
+		handleDetail(state, instanceID)
+	}
 
 	go func() {
 		w := new(app.Window)
@@ -139,6 +142,9 @@ func run(w *app.Window, state *ui.AppState) error {
 				}),
 				layout.Rigid(func(gtx layout.Context) layout.Dimensions {
 					return ui.LayoutCostPanel(gtx, th, state)
+				}),
+				layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+					return ui.LayoutDetailPanel(gtx, th, state)
 				}),
 				layout.Flexed(1, func(gtx layout.Context) layout.Dimensions {
 					return ui.LayoutTable(gtx, th, state)

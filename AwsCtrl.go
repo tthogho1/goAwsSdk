@@ -33,6 +33,7 @@ func Usage() {
 	fmt.Println("awsctrl -c S3upload -b <bucketName> -t <localdir>")
 	fmt.Println("awsctrl -c describe -t ECS -n <cluster>")
 	fmt.Println("awsctrl -c cost -start <YYYY-MM-DD> -end <YYYY-MM-DD>")
+	fmt.Println("awsctrl -c detail -t EC2 -i <instanceid>")
 	fmt.Println("awsctrl -c create -t EC2 -ami <ami id> -type <instance type> -key <string> -nerwork-interfaces <string>")
 	fmt.Println("awsctrl -c exec -exec <cmdstring> -t EC2 -i <instanceid> ")
 
@@ -142,6 +143,13 @@ func main() {
 	case "cost":
 		svc := costexplorer.New(sess)
 		utils.Cost(svc, *Options.start, *Options.end)
+	case "detail":
+		if *Options.target == "EC2" {
+			svc := ec2.New(sess, aws.NewConfig().WithRegion(*Options.region))
+			utils.DescribeInstanceDetail(svc, Options.instansString)
+		} else {
+			fmt.Println("detail target " + *Options.target + " is Invalid")
+		}
 	case "describe":
 		//  create a EC2 service client
 		if *Options.target == "EC2" {
