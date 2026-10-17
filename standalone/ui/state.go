@@ -46,6 +46,14 @@ type AppState struct {
 	ErrMsg  string
 	InfoMsg string
 
+	// Cost panel
+	CostBtn       widget.Clickable
+	CostPanelOpen bool
+	CostCloseBtn  widget.Clickable
+	CostEntries   []model.CostEntry
+	CostTotal     float64
+	CostPeriod    string
+
 	// Header status filter menu
 	HeaderStatusBtn      widget.Clickable
 	HeaderStatusFilter   string

@@ -64,3 +64,15 @@ func executeAwsCtrlAction(profile, action, instanceID string) error {
 	}
 	return nil
 }
+
+// executeAwsCtrlCost runs the "cost" subcommand of awsctrl for the given profile and date range
+func executeAwsCtrlCost(profile, start, end string) (string, error) {
+	cmd := exec.Command(awsctrlPath, "-profile", profile, "-c", "cost", "-start", start, "-end", end)
+	setHideWindow(cmd)
+
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("%v\n%s", err, string(out))
+	}
+	return string(out), nil
+}

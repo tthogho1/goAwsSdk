@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"ec2viewer/ui"
 )
@@ -65,4 +66,42 @@ func handleExecute(state *ui.AppState) {
 	}
 	state.InfoMsg = "Execution complete"
 	state.ErrMsg = ""
+}
+
+// handleCost handles the processing when the "Cost" button is pressed.
+// It fetches cost-and-usage data for the current month (1st day through today).
+func handleCost(state *ui.AppState) {
+	profile := strings.TrimSpace(state.SelectedProfile)
+	if profile == "" {
+		state.ErrMsg = "Please select a profile"
+		state.InfoMsg = ""
+		return
+	}
+
+	now := time.Now()
+	start := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
+	// Cost Explorer's End date is exclusive, so use tomorrow to include today
+	end := now.AddDate(0, 0, 1)
+
+	startStr := start.Format("2006-01-02")
+	endStr := end.Format("2006-01-02")
+
+	output, err := executeAwsCtrlCost(profile, startStr, endStr)
+	if err != nil {
+		state.ErrMsg = fmt.Sprintf("cost execution error: %v", err)
+		state.InfoMsg = ""
+		return
+	}
+
+	entries, total := parseCostOutput(output)
+	state.CostEntries = entries
+	state.CostTotal = total
+	state.CostPeriod = fmt.Sprintf("%s - %s", startStr, endStr)
+	state.CostPanelOpen = true
+	state.ErrMsg = ""
+	if len(entries) == 0 {
+		state.InfoMsg = "No cost data found for this period"
+	} else {
+		state.InfoMsg = ""
+	}
 }

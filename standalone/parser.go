@@ -1,6 +1,7 @@
 package main
 
 import (
+	"strconv"
 	"strings"
 
 	"ec2viewer/model"
@@ -71,4 +72,38 @@ func parseInstanceLine(line string) model.Instance {
 		PublicIP:     publicIP,
 		Name:         name,
 	}
+}
+
+// parseCostOutput parses the output of "awsctrl -c cost ..." into per-service
+// cost entries and a grand total.
+// Expected lines look like:
+//
+//	Time Period: 2026-10-01 - 2026-10-17
+//	Service: Amazon EC2, Amount: 12.340000
+//	Total: 123.450000
+func parseCostOutput(output string) ([]model.CostEntry, float64) {
+	var entries []model.CostEntry
+	var total float64
+
+	lines := strings.Split(output, "\n")
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		switch {
+		case strings.HasPrefix(trimmed, "Service:"):
+			rest := strings.TrimPrefix(trimmed, "Service:")
+			parts := strings.SplitN(rest, ", Amount:", 2)
+			if len(parts) != 2 {
+				continue
+			}
+			service := strings.TrimSpace(parts[0])
+			amount := strings.TrimSpace(parts[1])
+			entries = append(entries, model.CostEntry{Service: service, Amount: amount})
+		case strings.HasPrefix(trimmed, "Total:"):
+			amountStr := strings.TrimSpace(strings.TrimPrefix(trimmed, "Total:"))
+			if v, err := strconv.ParseFloat(amountStr, 64); err == nil {
+				total = v
+			}
+		}
+	}
+	return entries, total
 }
