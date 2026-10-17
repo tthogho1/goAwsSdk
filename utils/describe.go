@@ -29,8 +29,29 @@ func Describe(svc *ec2.EC2, pattern *string) {
 			if instance.PublicIpAddress != nil {
 				publicIp = *instance.PublicIpAddress
 			}
-			fmt.Printf(" ID: %s,  %s, %s, %s, %s", *instance.InstanceId,
-				*instance.State.Name, *instance.InstanceType, *instance.PrivateIpAddress, publicIp)
+
+			privateIp := "None"
+			if instance.PrivateIpAddress != nil {
+				privateIp = *instance.PrivateIpAddress
+			}
+
+			instanceId := "None"
+			if instance.InstanceId != nil {
+				instanceId = *instance.InstanceId
+			}
+
+			stateName := "None"
+			if instance.State != nil && instance.State.Name != nil {
+				stateName = *instance.State.Name
+			}
+
+			instanceType := "None"
+			if instance.InstanceType != nil {
+				instanceType = *instance.InstanceType
+			}
+
+			fmt.Printf(" ID: %s,  %s, %s, %s, %s", instanceId,
+				stateName, instanceType, privateIp, publicIp)
 
 			for _, tag := range instance.Tags {
 				fmt.Printf("  %s: %s", *tag.Key, *tag.Value)

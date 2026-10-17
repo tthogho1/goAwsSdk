@@ -70,6 +70,12 @@ func LayoutTopBar(gtx layout.Context, th *material.Theme, s *AppState) layout.Di
 						}
 						return btn.Layout(gtx)
 					}),
+					layout.Rigid(layout.Spacer{Width: unit.Dp(8)}.Layout),
+					layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+						btn := material.Button(th, &s.CostBtn, "Cost")
+						btn.Inset = layout.UniformInset(unit.Dp(6))
+						return btn.Layout(gtx)
+					}),
 				)
 			})
 		}),
@@ -524,6 +530,69 @@ func LayoutFooter(gtx layout.Context, th *material.Theme, s *AppState) layout.Di
 					return lbl.Layout(gtx)
 				}),
 			)
+		})
+	})
+}
+
+// LayoutCostPanel draws a panel showing per-service AWS cost and a total
+func LayoutCostPanel(gtx layout.Context, th *material.Theme, s *AppState) layout.Dimensions {
+	if !s.CostPanelOpen {
+		return layout.Dimensions{}
+	}
+	for s.CostCloseBtn.Clicked(gtx) {
+		s.CostPanelOpen = false
+	}
+	return drawRowBackground(gtx, color.NRGBA{R: 250, G: 250, B: 235, A: 255}, func(gtx layout.Context) layout.Dimensions {
+		return layout.UniformInset(unit.Dp(8)).Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+			var children []layout.FlexChild
+
+			children = append(children, layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+				return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
+					layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+						title := "AWS Cost"
+						if s.CostPeriod != "" {
+							title = title + " (" + s.CostPeriod + ")"
+						}
+						lbl := material.Body1(th, title)
+						lbl.Font.Weight = font.Bold
+						return lbl.Layout(gtx)
+					}),
+					layout.Flexed(1, layout.Spacer{}.Layout),
+					layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+						btn := material.Button(th, &s.CostCloseBtn, "Close")
+						btn.Inset = layout.UniformInset(unit.Dp(4))
+						return btn.Layout(gtx)
+					}),
+				)
+			}))
+
+			for _, entry := range s.CostEntries {
+				service := entry.Service
+				amount := entry.Amount
+				children = append(children, layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+					return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
+						layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+							gtx.Constraints.Min.X = gtx.Dp(unit.Dp(300))
+							lbl := material.Body2(th, service)
+							lbl.MaxLines = 1
+							return lbl.Layout(gtx)
+						}),
+						layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+							lbl := material.Body2(th, "$"+amount)
+							lbl.MaxLines = 1
+							return lbl.Layout(gtx)
+						}),
+					)
+				}))
+			}
+
+			children = append(children, layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+				lbl := material.Body1(th, fmt.Sprintf("Total: $%.2f", s.CostTotal))
+				lbl.Font.Weight = font.Bold
+				return lbl.Layout(gtx)
+			}))
+
+			return layout.Flex{Axis: layout.Vertical}.Layout(gtx, children...)
 		})
 	})
 }

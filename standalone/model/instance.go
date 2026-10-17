@@ -10,6 +10,12 @@ type Instance struct {
 	Name         string
 }
 
+// CostEntry holds a single service's cost amount for a time period
+type CostEntry struct {
+	Service string
+	Amount  string
+}
+
 // MapStatus converts an AWS status into on/off/-
 func MapStatus(awsStatus string) string {
 	switch awsStatus {

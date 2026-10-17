@@ -107,6 +107,11 @@ func run(w *app.Window, state *ui.AppState) error {
 				handleExecute(state)
 			}
 
+			// Handle "Cost" button press
+			if state.CostBtn.Clicked(gtx) {
+				handleCost(state)
+			}
+
 			// update search query each frame; mark dirty when changed
 			newQuery := strings.TrimSpace(state.SearchEditor.Text())
 			if newQuery != state.SearchQuery {
@@ -131,6 +136,9 @@ func run(w *app.Window, state *ui.AppState) error {
 				}),
 				layout.Rigid(func(gtx layout.Context) layout.Dimensions {
 					return ui.LayoutSearchBar(gtx, th, state)
+				}),
+				layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+					return ui.LayoutCostPanel(gtx, th, state)
 				}),
 				layout.Flexed(1, func(gtx layout.Context) layout.Dimensions {
 					return ui.LayoutTable(gtx, th, state)
