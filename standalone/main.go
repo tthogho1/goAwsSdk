@@ -43,8 +43,7 @@ func main() {
 		}
 	}
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "cannot initialize logger %s: %v\n", logPath, err)
-		os.Exit(1)
+		fatalStartup(fmt.Sprintf("cannot initialize logger %s: %v", logPath, err))
 	}
 	logFile = f
 	logger = lg
@@ -55,13 +54,8 @@ func main() {
 	}()
 
 	// Load .env (prefer the directory next to the executable)
-	if err := loadEnv(envFilePath()); err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to load .env file: %v\n", err)
-		os.Exit(1)
-	}
-	if awsctrlPath == "" {
-		fmt.Fprintln(os.Stderr, "AWSCTRL_PATH is not set in .env")
-		os.Exit(1)
+	if err := checkConfig(); err != nil {
+		fatalStartup(err.Error())
 	}
 
 	state := &ui.AppState{Logger: sugar}
@@ -86,6 +80,17 @@ func main() {
 		os.Exit(0)
 	}()
 	app.Main()
+}
+
+// fatalStartup logs msg, shows it to the user and exits. Used before the
+// window opens, where the error would otherwise be lost on Windows.
+func fatalStartup(msg string) {
+	logErrorf("startup failed: %s", msg)
+	if logger != nil {
+		_ = logger.Sync()
+	}
+	showStartupError("EC2 Instances Viewer", msg)
+	os.Exit(1)
 }
 
 // run is the window event loop
