@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 
 	"github.com/joho/godotenv"
 )
@@ -41,6 +42,37 @@ func loadEnv(path string) error {
 	}
 	awsctrlPath = os.Getenv("AWSCTRL_PATH")
 	return nil
+}
+
+// checkConfig loads .env and verifies AWSCTRL_PATH points to an executable.
+// Errors include setup instructions since they are shown directly to the user.
+func checkConfig() error {
+	path := envFilePath()
+	if _, err := os.Stat(path); err != nil {
+		return fmt.Errorf("Configuration file .env was not found.\n\n%s", envHelp())
+	}
+	if err := loadEnv(path); err != nil {
+		return fmt.Errorf("Failed to load %s: %v\n\n%s", path, err, envHelp())
+	}
+	if awsctrlPath == "" {
+		return fmt.Errorf("AWSCTRL_PATH is not set in %s.\n\n%s", path, envHelp())
+	}
+	if _, err := exec.LookPath(awsctrlPath); err != nil {
+		return fmt.Errorf("awsctrl executable not found:\n  AWSCTRL_PATH=%s\n\n%s", awsctrlPath, envHelp())
+	}
+	return nil
+}
+
+// envHelp describes where .env goes and what it must contain.
+func envHelp() string {
+	example := "/path/to/awsctrl"
+	if runtime.GOOS == "windows" {
+		example = `C:\path\to\awsctrl.exe`
+	}
+	return fmt.Sprintf("Create a file named .env in:\n  %s\n\n"+
+		"with the following content:\n  AWSCTRL_PATH=%s\n\n"+
+		"Parameters:\n  AWSCTRL_PATH (required): full path to the awsctrl executable.",
+		exeDir(), example)
 }
 
 func executeAwsCtrl(profile string) (string, error) {
