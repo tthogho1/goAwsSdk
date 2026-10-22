@@ -10,6 +10,15 @@ on:
 jobs:
   build-root:
     name: Build awsctrl (root module)
+    strategy:
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+            ext: ""
+          - goos: windows
+            goarch: amd64
+            ext: ".exe"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -20,13 +29,17 @@ jobs:
           go-version: '1.22'
 
       - name: Build
-        run: go build -v -o awsctrl .
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: '0'
+        run: go build -v -o awsctrl-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }} .
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: awsctrl
-          path: awsctrl
+          name: awsctrl-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: awsctrl-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }}
 
   build-standalone:
     name: Build ec2viewer (standalone module)
