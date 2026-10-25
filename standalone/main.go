@@ -11,6 +11,7 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 
+	"ec2viewer/model"
 	"ec2viewer/ui"
 
 	"gioui.org/app"
@@ -65,6 +66,7 @@ func main() {
 		state.SelectedProfile = state.Profiles[0]
 	}
 	state.TableList.Axis = layout.Vertical
+	state.CfnRelated.Value = true
 	state.OnRowDetail = func(instanceID string) {
 		handleDetail(state, instanceID)
 	}
@@ -97,6 +99,7 @@ func fatalStartup(msg string) {
 func run(w *app.Window, state *ui.AppState) error {
 	th := material.NewTheme()
 	var ops op.Ops
+	cfnDone := make(chan model.CfnResult, 1)
 
 	for {
 		switch e := w.Event().(type) {
@@ -118,6 +121,22 @@ func run(w *app.Window, state *ui.AppState) error {
 			// Handle "Cost" button press
 			if state.CostBtn.Clicked(gtx) {
 				handleCost(state)
+			}
+
+			// CloudFormation generation: start in the background, pick up the result when done
+			if state.CfnBtn.Clicked(gtx) {
+				startCfn(state, cfnDone, w.Invalidate)
+			}
+			select {
+			case r := <-cfnDone:
+				applyCfnResult(state, r)
+			default:
+			}
+			if state.CfnCopyBtn.Clicked(gtx) {
+				handleCfnCopy(state)
+			}
+			if state.CfnSaveBtn.Clicked(gtx) {
+				handleCfnSave(state)
 			}
 
 			// update search query each frame; mark dirty when changed
@@ -150,6 +169,9 @@ func run(w *app.Window, state *ui.AppState) error {
 				}),
 				layout.Rigid(func(gtx layout.Context) layout.Dimensions {
 					return ui.LayoutDetailPanel(gtx, th, state)
+				}),
+				layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+					return ui.LayoutCfnPanel(gtx, th, state)
 				}),
 				layout.Flexed(1, func(gtx layout.Context) layout.Dimensions {
 					return ui.LayoutTable(gtx, th, state)

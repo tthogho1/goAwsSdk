@@ -12,6 +12,7 @@ awsctrl -c S3download -b <bucketName> -t <localdir>
 awsctrl -c describe -t ECS  
 awsctrl -c create -t EC2 -key <keypair> -ec2type <ec2type> -network-interfaces <json String>  
 awsctrl -c exec -exec <cmdstring> -t EC2 -i <instanceid> 
+awsctrl -c cfn -t EC2 -i <instanceid>,<instanceid> -o <template.yaml> [-related=false]  
 ```
 options detail:  
   -b string  
@@ -62,3 +63,13 @@ awsctrl -c up -i <instance_id>
 ```
 awsctrl -c down -i <instance_id>
 ```
+
+4.Generate a CloudFormation template from existing EC2 instances
+```
+awsctrl -c cfn -t EC2 -i i-aaa,i-bbb -o template.yaml
+```
+Uses the CloudFormation IaC generator (`CreateGeneratedTemplate`). By default the instances' VPC, Subnet and
+Security Groups are included (`-related=false` for instances only). Resources get `DeletionPolicy: Retain`.
+The generated template is deleted from the account after download. Treat the output as a draft and review it before deploying.
+Requires `cloudformation:CreateGeneratedTemplate`, `DescribeGeneratedTemplate`, `GetGeneratedTemplate`,
+`DeleteGeneratedTemplate` plus read access to the included resources.

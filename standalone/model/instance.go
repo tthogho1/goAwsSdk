@@ -64,3 +64,12 @@ func MapStatus(awsStatus string) string {
 		return "-"
 	}
 }
+
+// CfnResult holds the outcome of generating a CloudFormation template
+// from selected instances via "awsctrl -c cfn".
+type CfnResult struct {
+	Template  string   // YAML template body
+	Resources []string // "<type> <key>=<id>" lines included in the template
+	Warnings  []string // property warnings reported by the IaC generator
+	Err       string   // non-empty when generation failed
+}

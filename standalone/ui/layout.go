@@ -14,6 +14,7 @@ import (
 	"gioui.org/op/clip"
 	"gioui.org/op/paint"
 	"gioui.org/unit"
+	"gioui.org/widget"
 	"gioui.org/widget/material"
 	"github.com/atotto/clipboard"
 )
@@ -74,6 +75,24 @@ func LayoutTopBar(gtx layout.Context, th *material.Theme, s *AppState) layout.Di
 					layout.Rigid(func(gtx layout.Context) layout.Dimensions {
 						btn := material.Button(th, &s.CostBtn, "Cost")
 						btn.Inset = layout.UniformInset(unit.Dp(6))
+						return btn.Layout(gtx)
+					}),
+					layout.Rigid(layout.Spacer{Width: unit.Dp(16)}.Layout),
+					layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+						cb := material.CheckBox(th, &s.CfnRelated, "with VPC/Subnet/SG")
+						return cb.Layout(gtx)
+					}),
+					layout.Rigid(layout.Spacer{Width: unit.Dp(8)}.Layout),
+					layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+						label := "Generate CFn"
+						if s.CfnRunning {
+							label = "Generating..."
+						}
+						btn := material.Button(th, &s.CfnBtn, label)
+						btn.Inset = layout.UniformInset(unit.Dp(6))
+						if s.CfnRunning || len(s.SelectedInstanceIDs()) == 0 {
+							btn.Background = color.NRGBA{R: 180, G: 180, B: 180, A: 255}
+						}
 						return btn.Layout(gtx)
 					}),
 				)
@@ -436,7 +455,7 @@ func LayoutTable(gtx layout.Context, th *material.Theme, s *AppState) layout.Dim
 							statusDisplay += "*"
 						}
 					}
-					cells := []string{inst.ID, inst.Status, inst.InstanceType, inst.DisplayPrivateIP(), inst.PublicIP, inst.Name, statusDisplay}
+					cells := []string{inst.ID, inst.Status, inst.InstanceType, inst.DisplayPrivateIP(), inst.PublicIP, inst.Name, statusDisplay, ""}
 					var children []layout.FlexChild
 					for i, cell := range cells {
 						if !s.ColVisible[i] {
@@ -448,6 +467,10 @@ func LayoutTable(gtx layout.Context, th *material.Theme, s *AppState) layout.Dim
 						children = append(children, layout.Rigid(func(gtx layout.Context) layout.Dimensions {
 							gtx.Constraints.Min.X = gtx.Dp(colW)
 							gtx.Constraints.Max.X = gtx.Dp(colW)
+							// Select column: checkbox for CFn generation
+							if cellIdx == SelectCol && actualIdx < len(s.SelectBoxes) {
+								return material.CheckBox(th, &s.SelectBoxes[actualIdx], "").Layout(gtx)
+							}
 							clickIdx := actualIdx*len(cells) + cellIdx
 							if clickIdx < 0 || clickIdx >= len(s.CellClickables) {
 								lbl := material.Body2(th, cellText)
@@ -687,6 +710,91 @@ func LayoutDetailPanel(gtx layout.Context, th *material.Theme, s *AppState) layo
 					}
 					addRow(label, tag.Key+" = "+tag.Value)
 				}
+			}
+
+			return layout.Flex{Axis: layout.Vertical}.Layout(gtx, children...)
+		})
+	})
+}
+
+// cfnMaxWarnings is the number of generator warnings listed in the CFn panel
+const cfnMaxWarnings = 5
+
+// LayoutCfnPanel draws a panel with the generated CloudFormation template:
+// the included resources, generator warnings and a read-only YAML preview.
+func LayoutCfnPanel(gtx layout.Context, th *material.Theme, s *AppState) layout.Dimensions {
+	if !s.CfnPanelOpen {
+		return layout.Dimensions{}
+	}
+	for s.CfnCloseBtn.Clicked(gtx) {
+		s.CfnPanelOpen = false
+	}
+	return drawRowBackground(gtx, color.NRGBA{R: 240, G: 250, B: 240, A: 255}, func(gtx layout.Context) layout.Dimensions {
+		return layout.UniformInset(unit.Dp(8)).Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+			var children []layout.FlexChild
+
+			button := func(c *widget.Clickable, text string) layout.FlexChild {
+				return layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+					btn := material.Button(th, c, text)
+					btn.Inset = layout.UniformInset(unit.Dp(4))
+					return layout.Inset{Left: unit.Dp(8)}.Layout(gtx, btn.Layout)
+				})
+			}
+			header := []layout.FlexChild{
+				layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+					lbl := material.Body1(th, fmt.Sprintf("CloudFormation Template (%d resources)", len(s.Cfn.Resources)))
+					lbl.Font.Weight = font.Bold
+					return lbl.Layout(gtx)
+				}),
+				layout.Flexed(1, layout.Spacer{}.Layout),
+			}
+			if s.Cfn.Template != "" {
+				header = append(header, button(&s.CfnCopyBtn, "Copy"), button(&s.CfnSaveBtn, "Save"))
+			}
+			header = append(header, button(&s.CfnCloseBtn, "Close"))
+			children = append(children, layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+				return layout.Flex{Alignment: layout.Middle}.Layout(gtx, header...)
+			}))
+
+			addLine := func(text string, col color.NRGBA, maxLines int) {
+				children = append(children, layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+					lbl := material.Body2(th, text)
+					lbl.Color = col
+					lbl.MaxLines = maxLines
+					return lbl.Layout(gtx)
+				}))
+			}
+			gray := color.NRGBA{R: 90, G: 90, B: 90, A: 255}
+			if len(s.Cfn.Resources) > 0 {
+				addLine("Resources: "+strings.Join(s.Cfn.Resources, ", "), gray, 2)
+			}
+			if s.Cfn.Err != "" {
+				addLine(s.Cfn.Err, color.NRGBA{R: 220, G: 50, B: 50, A: 255}, 6)
+			}
+			warn := color.NRGBA{R: 180, G: 110, B: 0, A: 255}
+			for i, w := range s.Cfn.Warnings {
+				if i == cfnMaxWarnings {
+					addLine(fmt.Sprintf("... and %d more warnings", len(s.Cfn.Warnings)-cfnMaxWarnings), warn, 1)
+					break
+				}
+				addLine("Warning: "+w, warn, 1)
+			}
+
+			if s.Cfn.Template != "" {
+				addLine("Draft only: review IAM, security group rules and hardcoded IDs, and validate before deploying.", gray, 1)
+				children = append(children, layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+					s.CfnEditor.ReadOnly = true
+					h := gtx.Dp(unit.Dp(220))
+					gtx.Constraints.Min.Y = h
+					gtx.Constraints.Max.Y = h
+					return drawRowBackground(gtx, color.NRGBA{R: 255, G: 255, B: 255, A: 255}, func(gtx layout.Context) layout.Dimensions {
+						return layout.UniformInset(unit.Dp(4)).Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+							ed := material.Editor(th, &s.CfnEditor, "")
+							ed.TextSize = unit.Sp(12)
+							return ed.Layout(gtx)
+						})
+					})
+				}))
 			}
 
 			return layout.Flex{Axis: layout.Vertical}.Layout(gtx, children...)
