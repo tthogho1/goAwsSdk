@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 
 	"github.com/joho/godotenv"
 )
@@ -118,6 +119,20 @@ func executeAwsCtrlDetail(profile, instanceID string) (string, error) {
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("%v\n%s", err, string(out))
+	}
+	return string(out), nil
+}
+
+// executeAwsCtrlCfn runs the "cfn" subcommand of awsctrl, which generates a
+// CloudFormation template for the given instances and writes it to outPath.
+func executeAwsCtrlCfn(profile string, instanceIDs []string, related bool, outPath string) (string, error) {
+	cmd := exec.Command(awsctrlPath, "-profile", profile, "-c", "cfn", "-t", "EC2",
+		"-i", strings.Join(instanceIDs, ","), "-o", outPath, fmt.Sprintf("-related=%t", related))
+	setHideWindow(cmd)
+
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return string(out), fmt.Errorf("%v\n%s", err, string(out))
 	}
 	return string(out), nil
 }

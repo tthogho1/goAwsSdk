@@ -5,11 +5,13 @@ import (
 	"awsctrl/utils"
 	"flag"
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/apprunner"
+	"github.com/aws/aws-sdk-go/service/cloudformation"
 	"github.com/aws/aws-sdk-go/service/costexplorer"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/ecs"
@@ -36,6 +38,7 @@ func Usage() {
 	fmt.Println("awsctrl -c detail -t EC2 -i <instanceid>")
 	fmt.Println("awsctrl -c create -t EC2 -ami <ami id> -type <instance type> -key <string> -nerwork-interfaces <string>")
 	fmt.Println("awsctrl -c exec -exec <cmdstring> -t EC2 -i <instanceid> ")
+	fmt.Println("awsctrl -c cfn -t EC2 -i <instanceid>,<instanceid> -o <template.yaml> [-related=false]")
 
 	fmt.Println()
 	fmt.Println("options detail:")
@@ -61,6 +64,8 @@ type Options struct {
 	keyPair       *string
 	groupID       *string
 	cmdstring     *string
+	output        *string
+	related       *bool
 	network       *types.NetWorkIF
 }
 
@@ -69,7 +74,7 @@ func OptionParse() Options {
 	Options := Options{}
 	Options.profile = flag.String("profile", "default", "Specifiy Credential profile")
 	Options.region = flag.String("region", "ap-northeast-1", "Specify AWS region")
-	Options.cmd = flag.String("c", "describe", "command : describe | up |down | S3download | AMI |exec")
+	Options.cmd = flag.String("c", "describe", "command : describe | up |down | S3download | AMI |exec | cfn")
 	Options.target = flag.String("t", "EC2", "target : EC2 | appRunner | local dir | ECS | SecurityGroup")
 	Options.pattern = flag.String("p", "", "regression pattern for Names of Tag")
 	Options.file = flag.String("f", "", "upload file name")
@@ -89,6 +94,9 @@ func OptionParse() Options {
 	Options.groupID = flag.String("g", "", "group id")
 
 	Options.cmdstring = flag.String("exec", "", "command string")
+
+	Options.output = flag.String("o", "template.yaml", "output file for cfn")
+	Options.related = flag.Bool("related", true, "cfn: also include VPC, Subnet and Security Groups of the instances")
 
 	// json部分
 	netWorkFlag := &types.NetWorkIF{Data: make(map[string]interface{})}
@@ -139,6 +147,17 @@ func main() {
 			utils.CreateInstance(svc, *Options.amiString, *Options.ec2type, *Options.keyPair, *Options.network)
 		} else {
 			fmt.Println("create target " + *Options.target + " is Invalid")
+		}
+	case "cfn":
+		if *Options.target != "EC2" {
+			fmt.Println("cfn target " + *Options.target + " is Invalid")
+			os.Exit(1)
+		}
+		ec2Svc := ec2.New(sess, aws.NewConfig().WithRegion(*Options.region))
+		cfnSvc := cloudformation.New(sess, aws.NewConfig().WithRegion(*Options.region))
+		if err := utils.GenerateCfnTemplate(ec2Svc, cfnSvc, instanceIds, *Options.related, *Options.output); err != nil {
+			fmt.Println("Error: " + err.Error())
+			os.Exit(1)
 		}
 	case "cost":
 		svc := costexplorer.New(sess)

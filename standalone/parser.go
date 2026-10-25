@@ -144,3 +144,23 @@ func parseInstanceDetail(output string) model.InstanceDetail {
 	}
 	return detail
 }
+
+// parseCfnOutput parses the output of "awsctrl -c cfn ..." into the included
+// resources and generator warnings. Expected lines look like:
+//
+//	Resource: AWS::EC2::Instance InstanceId=i-0123456789abcdef0
+//	Status: CREATE_IN_PROGRESS
+//	Warning: AWS::EC2::Instance InstanceId=i-xxxx: /Properties/UserData ...
+//	Template: /path/to/template.yaml
+func parseCfnOutput(output string) (resources, warnings []string) {
+	for _, line := range strings.Split(output, "\n") {
+		trimmed := strings.TrimSpace(line)
+		switch {
+		case strings.HasPrefix(trimmed, "Resource:"):
+			resources = append(resources, strings.TrimSpace(strings.TrimPrefix(trimmed, "Resource:")))
+		case strings.HasPrefix(trimmed, "Warning:"):
+			warnings = append(warnings, strings.TrimSpace(strings.TrimPrefix(trimmed, "Warning:")))
+		}
+	}
+	return resources, warnings
+}

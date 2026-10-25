@@ -10,10 +10,13 @@ import (
 )
 
 // Headers are the table column names
-var Headers = []string{"ID", "Status", "Type", "PrivateIP", "PublicIP", "Name", "on/off"}
+var Headers = []string{"ID", "Status", "Type", "PrivateIP", "PublicIP", "Name", "on/off", "Select"}
 
 // ColWidths are the widths of each table column
-var ColWidths = []unit.Dp{180, 80, 100, 220, 130, 160, 60}
+var ColWidths = []unit.Dp{180, 80, 100, 220, 130, 160, 60, 60}
+
+// SelectCol is the index of the "Select" checkbox column used for CFn generation
+const SelectCol = 7
 
 // AppState is a struct that centrally manages the UI and data state
 type AppState struct {
@@ -23,6 +26,7 @@ type AppState struct {
 	DesiredStatus  []string
 	ToggleBtns     []widget.Clickable
 	CellClickables []widget.Clickable
+	SelectBoxes    []widget.Bool // "Select" column, used for CFn generation
 
 	// Filter / display
 	VisibleIndices []int
@@ -63,6 +67,17 @@ type AppState struct {
 	// is clicked, so the caller (main package) can fetch instance details.
 	OnRowDetail func(instanceID string)
 
+	// CloudFormation template generation (from instances checked in the Select column)
+	CfnBtn       widget.Clickable
+	CfnRelated   widget.Bool // also include VPC / Subnet / Security Groups
+	CfnRunning   bool
+	CfnPanelOpen bool
+	CfnCloseBtn  widget.Clickable
+	CfnSaveBtn   widget.Clickable
+	CfnCopyBtn   widget.Clickable
+	CfnEditor    widget.Editor // read-only template preview
+	Cfn          model.CfnResult
+
 	// Header status filter menu
 	HeaderStatusBtn      widget.Clickable
 	HeaderStatusFilter   string
@@ -102,6 +117,7 @@ func (s *AppState) InitStatusSlices() {
 	s.OriginalStatus = make([]string, n)
 	s.DesiredStatus = make([]string, n)
 	s.ToggleBtns = make([]widget.Clickable, n)
+	s.SelectBoxes = make([]widget.Bool, n)
 	// Create clickables for instance count x column count
 	s.CellClickables = make([]widget.Clickable, n*len(Headers))
 	for i, inst := range s.Instances {
@@ -143,4 +159,15 @@ func (s *AppState) HasStatusChanges() bool {
 		}
 	}
 	return false
+}
+
+// SelectedInstanceIDs returns the IDs of instances checked in the Select column
+func (s *AppState) SelectedInstanceIDs() []string {
+	var ids []string
+	for i := range s.SelectBoxes {
+		if s.SelectBoxes[i].Value && i < len(s.Instances) {
+			ids = append(ids, s.Instances[i].ID)
+		}
+	}
+	return ids
 }
