@@ -649,6 +649,14 @@ func LayoutDetailPanel(gtx layout.Context, th *material.Theme, s *AppState) layo
 					}),
 					layout.Flexed(1, layout.Spacer{}.Layout),
 					layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+						if s.Detail.InstanceId == "" || s.DetailErr != "" {
+							return layout.Dimensions{}
+						}
+						btn := material.Button(th, &s.SGEditBtn, "Edit SGs")
+						btn.Inset = layout.UniformInset(unit.Dp(4))
+						return layout.Inset{Right: unit.Dp(8)}.Layout(gtx, btn.Layout)
+					}),
+					layout.Rigid(func(gtx layout.Context) layout.Dimensions {
 						btn := material.Button(th, &s.DetailCloseBtn, "Close")
 						btn.Inset = layout.UniformInset(unit.Dp(4))
 						return btn.Layout(gtx)
@@ -794,6 +802,255 @@ func LayoutCfnPanel(gtx layout.Context, th *material.Theme, s *AppState) layout.
 							return ed.Layout(gtx)
 						})
 					})
+				}))
+			}
+
+			return layout.Flex{Axis: layout.Vertical}.Layout(gtx, children...)
+		})
+	})
+}
+
+// sgRuleColWidths are the widths of the rule table columns:
+// direction, protocol, ports, source, description, button
+var sgRuleColWidths = []unit.Dp{70, 60, 100, 170, 260, 90}
+
+// sgDisplayProto shows protocol "-1" as "all"
+func sgDisplayProto(p string) string {
+	if p == "-1" {
+		return "all"
+	}
+	return p
+}
+
+// sgDisplayPorts formats a rule's port range for display
+func sgDisplayPorts(r model.SGRule) string {
+	if r.Protocol == "-1" || (r.FromPort == "-1" && r.ToPort == "-1") {
+		return "all"
+	}
+	if r.Protocol == "icmp" {
+		return "type " + r.FromPort + " code " + r.ToPort
+	}
+	if r.FromPort == r.ToPort {
+		return r.FromPort
+	}
+	return r.FromPort + "-" + r.ToPort
+}
+
+// LayoutSGPanel draws the security group editor for one instance: which SGs
+// are attached, the rules of the selected SG, and a form to add a rule.
+// Button clicks are handled by the event loop in main.go.
+func LayoutSGPanel(gtx layout.Context, th *material.Theme, s *AppState) layout.Dimensions {
+	if !s.SGPanelOpen {
+		return layout.Dimensions{}
+	}
+	for s.SGCloseBtn.Clicked(gtx) {
+		s.SGPanelOpen = false
+	}
+	blue := color.NRGBA{R: 0, G: 80, B: 160, A: 255}
+	gray := color.NRGBA{R: 130, G: 130, B: 130, A: 255}
+
+	button := func(c *widget.Clickable, text string) layout.Widget {
+		return func(gtx layout.Context) layout.Dimensions {
+			btn := material.Button(th, c, text)
+			btn.Inset = layout.UniformInset(unit.Dp(4))
+			return btn.Layout(gtx)
+		}
+	}
+	label := func(text string, bold bool) layout.Widget {
+		return func(gtx layout.Context) layout.Dimensions {
+			lbl := material.Body2(th, text)
+			if bold {
+				lbl.Font.Weight = font.Bold
+			}
+			lbl.MaxLines = 1
+			return lbl.Layout(gtx)
+		}
+	}
+	editor := func(ed *widget.Editor, hint string, w unit.Dp) layout.Widget {
+		return func(gtx layout.Context) layout.Dimensions {
+			ed.SingleLine = true
+			gtx.Constraints.Min.X = gtx.Dp(w)
+			gtx.Constraints.Max.X = gtx.Dp(w)
+			return drawRowBackground(gtx, color.NRGBA{R: 255, G: 255, B: 255, A: 255}, func(gtx layout.Context) layout.Dimensions {
+				return layout.UniformInset(unit.Dp(4)).Layout(gtx, material.Editor(th, ed, hint).Layout)
+			})
+		}
+	}
+	space := layout.Rigid(layout.Spacer{Width: unit.Dp(8)}.Layout)
+	row := func(children ...layout.FlexChild) layout.FlexChild {
+		return layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+			return layout.Inset{Top: unit.Dp(4)}.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+				return layout.Flex{Alignment: layout.Middle}.Layout(gtx, children...)
+			})
+		})
+	}
+
+	return drawRowBackground(gtx, color.NRGBA{R: 250, G: 240, B: 235, A: 255}, func(gtx layout.Context) layout.Dimensions {
+		return layout.UniformInset(unit.Dp(8)).Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+			var children []layout.FlexChild
+
+			// Header
+			title := "Security Groups: " + s.SGInstanceID
+			if s.SGVpcID != "" {
+				title += " (" + s.SGVpcID + ")"
+			}
+			children = append(children, row(
+				layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+					lbl := material.Body1(th, title)
+					lbl.Font.Weight = font.Bold
+					return lbl.Layout(gtx)
+				}),
+				layout.Flexed(1, layout.Spacer{}.Layout),
+				layout.Rigid(button(&s.SGCloseBtn, "Close")),
+			))
+
+			// Attached SGs: checkbox per SG in the VPC + Apply
+			children = append(children, row(
+				layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+					gtx.Constraints.Min.X = gtx.Dp(unit.Dp(80))
+					return label("Attached:", true)(gtx)
+				}),
+				layout.Flexed(1, func(gtx layout.Context) layout.Dimensions {
+					if len(s.SGAll) == 0 {
+						return label("(no security groups found in this VPC)", false)(gtx)
+					}
+					s.SGAttachList.Axis = layout.Horizontal
+					return material.List(th, &s.SGAttachList).Layout(gtx, len(s.SGAll), func(gtx layout.Context, i int) layout.Dimensions {
+						if i >= len(s.SGAttachBoxes) {
+							return layout.Dimensions{}
+						}
+						return layout.Inset{Right: unit.Dp(12)}.Layout(gtx,
+							material.CheckBox(th, &s.SGAttachBoxes[i], s.SGAll[i].Label()).Layout)
+					})
+				}),
+				space,
+				layout.Rigid(button(&s.SGApplyBtn, "Apply")),
+			))
+
+			// Which attached SG's rules to show
+			sel := []layout.FlexChild{layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+				gtx.Constraints.Min.X = gtx.Dp(unit.Dp(80))
+				return label("Rules for:", true)(gtx)
+			})}
+			if len(s.SGAttached) == 0 {
+				sel = append(sel, layout.Rigid(label("(no attached security groups)", false)))
+			}
+			for i, id := range s.SGAttached {
+				if i >= len(s.SGSelectBtns) {
+					break
+				}
+				idx, gid := i, id
+				sel = append(sel, layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+					return s.SGSelectBtns[idx].Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+						lbl := material.Body2(th, gid)
+						if gid == s.SGSelected {
+							lbl.Color = blue
+							lbl.Font.Weight = font.Bold
+						}
+						lbl.MaxLines = 1
+						return layout.UniformInset(unit.Dp(4)).Layout(gtx, lbl.Layout)
+					})
+				}), space)
+			}
+			children = append(children, row(sel...))
+
+			// Rule table
+			cell := func(i int, w layout.Widget) layout.FlexChild {
+				return layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+					gtx.Constraints.Min.X = gtx.Dp(sgRuleColWidths[i])
+					gtx.Constraints.Max.X = gtx.Dp(sgRuleColWidths[i])
+					return w(gtx)
+				})
+			}
+			children = append(children, row(
+				cell(0, label("Dir", true)), cell(1, label("Proto", true)), cell(2, label("Ports", true)),
+				cell(3, label("Source", true)), cell(4, label("Description", true)),
+			))
+			children = append(children, layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+				h := gtx.Dp(unit.Dp(130))
+				gtx.Constraints.Min.Y = h
+				gtx.Constraints.Max.Y = h
+				return drawRowBackground(gtx, color.NRGBA{R: 255, G: 255, B: 255, A: 255}, func(gtx layout.Context) layout.Dimensions {
+					if s.SGSelected != "" && len(s.SGRules) == 0 {
+						return layout.UniformInset(unit.Dp(4)).Layout(gtx, label("(no rules)", false))
+					}
+					s.SGRuleList.Axis = layout.Vertical
+					return material.List(th, &s.SGRuleList).Layout(gtx, len(s.SGRules), func(gtx layout.Context, i int) layout.Dimensions {
+						r := s.SGRules[i]
+						text := func(t string) layout.Widget {
+							return func(gtx layout.Context) layout.Dimensions {
+								lbl := material.Body2(th, t)
+								lbl.MaxLines = 1
+								if !r.Editable {
+									lbl.Color = gray
+								}
+								return lbl.Layout(gtx)
+							}
+						}
+						action := func(gtx layout.Context) layout.Dimensions {
+							if !r.Editable {
+								return text("read-only")(gtx)
+							}
+							if i >= len(s.SGRuleDelBtns) {
+								return layout.Dimensions{}
+							}
+							txt := "Delete"
+							if s.SGDelPending == i {
+								txt = "Confirm?"
+							}
+							btn := material.Button(th, &s.SGRuleDelBtns[i], txt)
+							btn.Inset = layout.UniformInset(unit.Dp(2))
+							btn.TextSize = unit.Sp(12)
+							if s.SGDelPending == i {
+								btn.Background = color.NRGBA{R: 220, G: 50, B: 50, A: 255}
+							}
+							return btn.Layout(gtx)
+						}
+						return layout.UniformInset(unit.Dp(2)).Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+							return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
+								cell(0, text(r.Direction)), cell(1, text(sgDisplayProto(r.Protocol))),
+								cell(2, text(sgDisplayPorts(r))), cell(3, text(r.Cidr)),
+								cell(4, text(r.Description)), cell(5, action),
+							)
+						})
+					})
+				})
+			}))
+
+			// Add-rule form
+			children = append(children, row(
+				layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+					gtx.Constraints.Min.X = gtx.Dp(unit.Dp(80))
+					return label("Add rule:", true)(gtx)
+				}),
+				layout.Rigid(button(&s.SGDirBtn, s.SGNewDir)), space,
+				layout.Rigid(button(&s.SGProtoBtn, s.SGNewProto)), space,
+				layout.Rigid(editor(&s.SGFromEd, "From", 70)), space,
+				layout.Rigid(editor(&s.SGToEd, "To", 70)), space,
+				layout.Rigid(editor(&s.SGCidrEd, "CIDR e.g. 203.0.113.5/32", 210)), space,
+				layout.Rigid(editor(&s.SGDescEd, "Description", 180)), space,
+				layout.Rigid(button(&s.SGAddBtn, "Add")),
+			))
+
+			// Create a new security group in this VPC
+			children = append(children, row(
+				layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+					gtx.Constraints.Min.X = gtx.Dp(unit.Dp(80))
+					return label("New SG:", true)(gtx)
+				}),
+				layout.Rigid(editor(&s.SGNewNameEd, "Name", 180)), space,
+				layout.Rigid(editor(&s.SGNewGroupDesc, "Description (default: name)", 260)), space,
+				layout.Rigid(material.CheckBox(th, &s.SGCreateAttach, "attach to this instance").Layout), space,
+				layout.Rigid(button(&s.SGCreateBtn, "Create")),
+			))
+
+			if s.SGErr != "" {
+				errText := s.SGErr
+				children = append(children, layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+					lbl := material.Body2(th, errText)
+					lbl.Color = color.NRGBA{R: 220, G: 50, B: 50, A: 255}
+					lbl.MaxLines = 4
+					return layout.Inset{Top: unit.Dp(4)}.Layout(gtx, lbl.Layout)
 				}))
 			}
 

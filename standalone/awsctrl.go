@@ -9,6 +9,8 @@ import (
 	"strings"
 
 	"github.com/joho/godotenv"
+
+	"ec2viewer/model"
 )
 
 // exeDir returns the directory containing the running executable,
@@ -135,4 +137,52 @@ func executeAwsCtrlCfn(profile string, instanceIDs []string, related bool, outPa
 		return string(out), fmt.Errorf("%v\n%s", err, string(out))
 	}
 	return string(out), nil
+}
+
+// runAwsCtrl runs awsctrl with the given arguments and returns its output.
+// On failure the error includes the output (awsctrl prints "Error: ...").
+func runAwsCtrl(args ...string) (string, error) {
+	cmd := exec.Command(awsctrlPath, args...)
+	setHideWindow(cmd)
+
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return string(out), fmt.Errorf("%v\n%s", err, string(out))
+	}
+	return string(out), nil
+}
+
+// executeAwsCtrlSGList lists the security groups of a VPC.
+func executeAwsCtrlSGList(profile, vpcID string) (string, error) {
+	return runAwsCtrl("-profile", profile, "-c", "sglist", "-vpc", vpcID)
+}
+
+// executeAwsCtrlSGRules prints the rules of a security group.
+func executeAwsCtrlSGRules(profile, groupID string) (string, error) {
+	return runAwsCtrl("-profile", profile, "-c", "sgrules", "-g", groupID)
+}
+
+// executeAwsCtrlSGRule adds (op "sgadd") or deletes (op "sgdel") an IPv4 CIDR rule.
+func executeAwsCtrlSGRule(profile, op, groupID string, r model.SGRule) (string, error) {
+	args := []string{"-profile", profile, "-c", op, "-g", groupID,
+		"-dir", r.Direction, "-proto", r.Protocol,
+		"-from", r.FromPort, "-to", r.ToPort, "-cidr", r.Cidr}
+	if op == "sgadd" && r.Description != "" {
+		args = append(args, "-desc", r.Description)
+	}
+	return runAwsCtrl(args...)
+}
+
+// executeAwsCtrlSGCreate creates a security group in a VPC.
+func executeAwsCtrlSGCreate(profile, vpcID, name, description string) (string, error) {
+	args := []string{"-profile", profile, "-c", "sgcreate", "-vpc", vpcID, "-n", name}
+	if description != "" {
+		args = append(args, "-desc", description)
+	}
+	return runAwsCtrl(args...)
+}
+
+// executeAwsCtrlSetSG replaces the security groups attached to an instance.
+func executeAwsCtrlSetSG(profile, instanceID string, groupIDs []string) (string, error) {
+	return runAwsCtrl("-profile", profile, "-c", "setsg", "-t", "EC2", "-i", instanceID, "-g", strings.Join(groupIDs, ","))
 }

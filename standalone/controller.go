@@ -123,6 +123,10 @@ func handleDetail(state *ui.AppState, instanceID string) {
 	if instanceID == "" {
 		return
 	}
+	// The SG panel edits one instance; close it when another one is opened
+	if state.SGPanelOpen && state.SGInstanceID != instanceID {
+		state.SGPanelOpen = false
+	}
 
 	output, err := executeAwsCtrlDetail(profile, instanceID)
 	if err != nil {

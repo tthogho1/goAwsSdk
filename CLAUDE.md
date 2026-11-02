@@ -40,7 +40,7 @@ cd sample-s3-list && go build ./...
 
 ### `awsctrl` (root)
 - `AwsCtrl.go` holds all flag parsing (`OptionParse`) and a `switch` on `-c` (command) and then `-t` (target) that builds the right aws-sdk-go v1 service client and calls into `utils/`.
-- `utils/` holds one file per area (`describe.go`, `updown.go`, `create.go`, `exec.go` via SSM, `s3.go`, `cost.go`, `cfn.go`). The functions print results straight to stdout rather than returning them.
+- `utils/` holds one file per area (`describe.go`, `updown.go`, `create.go`, `exec.go` via SSM, `s3.go`, `cost.go`, `cfn.go`, `sg.go` for security group listing/rule editing/attachment). The functions print results straight to stdout rather than returning them (`sg.go` also returns errors so `AwsCtrl.go` can exit 1).
 - `types/common.go` defines `NetWorkIF`, a `flag.Value` that parses the `-network-interfaces` JSON for `create`.
 - The default region is `ap-northeast-1`. Credentials come from shared-config profiles (`-profile`).
 - The README's usage section is partly out of date. The `Usage()` function in `AwsCtrl.go` lists the real commands.
@@ -49,9 +49,10 @@ cd sample-s3-list && go build ./...
 The GUI does **not** call AWS itself. It runs the `awsctrl` executable (path from `AWSCTRL_PATH` in a `.env` next to the executable or in the CWD) and parses its text output:
 
 - `awsctrl.go`: `executeAwsCtrl*` functions run `awsctrl -profile <p> [-c up|down|cost|detail ...]`.
-- `parser.go`: parses the plain-text formats printed by `utils/describe.go` (`ID: <id>,  <status>, <type>, <privateIP>, <publicIP>  Key: Val ...`, plus `InstanceId:/VpcId:/SubnetId:/SecurityGroup:/Tag:` lines for `detail`) and by `utils/cost.go` (`Service: X, Amount: Y` / `Total: N`), and by `utils/cfn.go` (`Resource:` / `Status:` / `Warning:` / `Template:` lines; the YAML itself goes to the `-o` file, not stdout).
+- `parser.go`: parses the plain-text formats printed by `utils/describe.go` (`ID: <id>,  <status>, <type>, <privateIP>, <publicIP>  Key: Val ...`, plus `InstanceId:/VpcId:/SubnetId:/SecurityGroup:/Tag:` lines for `detail`) and by `utils/cost.go` (`Service: X, Amount: Y` / `Total: N`), and by `utils/cfn.go` (`Resource:` / `Status:` / `Warning:` / `Template:` lines; the YAML itself goes to the `-o` file, not stdout). `utils/sg.go` prints `SG: <id> (<name>)` for `sglist`, `Created: <id> (<name>)` for `sgcreate`, `Group:` / `Rule: <dir>, <proto>, <from>, <to>, <cidr>, <desc>` / `RuleOther: <dir>, <proto>, <from>, <to>, <source>` for `sgrules`; the description is last because it may contain commas.
 - **If you change a `fmt.Printf` format in `utils/`, update `standalone/parser.go` to match.** Otherwise the GUI breaks without any error.
 - CFn generation is the one long-running action: `startCfn` runs awsctrl in a goroutine and sends the result on a channel that the event loop in `main.go` drains each frame (`applyCfnResult`). The goroutine must not touch `AppState`.
+- `sg.go` holds the security group panel handlers (opened via "Edit SGs" in the Detail panel), which call `sglist` / `sgrules` / `sgadd` / `sgdel` / `sgcreate` / `setsg`. Create + attach is `sgcreate` followed by `setsg` with the current groups plus the new one. Rule deletion is a two-click confirm.
 - `controller.go` holds the button handlers (Fetch / Execute up-down diff / Cost / Detail), which change `ui.AppState`. `ui/layout.go` and `ui/state.go` hold the Gio immediate-mode layout and the state. `model/` holds the plain data structs.
 - `awsprofiles.go` fills the profile picker from `~/.aws/credentials` and `~/.aws/config`.
 - Platform-specific code uses `_windows.go` / `_other.go` build-tag pairs: hiding the child-process console window, and showing startup errors in a MessageBox (the Windows build has no console). Startup failures go through `fatalStartup` so the user sees them instead of the app exiting silently.

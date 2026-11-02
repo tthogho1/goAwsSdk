@@ -73,3 +73,39 @@ type CfnResult struct {
 	Warnings  []string // property warnings reported by the IaC generator
 	Err       string   // non-empty when generation failed
 }
+
+// SGSummary identifies a security group (from "awsctrl -c sglist").
+type SGSummary struct {
+	ID   string
+	Name string
+}
+
+// Label returns "sg-xxx (name)", the same format as InstanceDetail.SecurityGroups.
+func (s SGSummary) Label() string {
+	if s.Name == "" {
+		return s.ID
+	}
+	return s.ID + " (" + s.Name + ")"
+}
+
+// SGRule is one security group rule (from "awsctrl -c sgrules").
+// Only IPv4 CIDR rules are Editable; for other rules (IPv6, SG reference,
+// prefix list) Cidr holds the source and Description is empty.
+type SGRule struct {
+	Direction   string // ingress | egress
+	Protocol    string // tcp | udp | icmp | -1
+	FromPort    string
+	ToPort      string
+	Cidr        string
+	Description string
+	Editable    bool
+}
+
+// SGIDFromDetail extracts the group ID from an "sg-xxx (name)" string.
+func SGIDFromDetail(s string) string {
+	s = strings.TrimSpace(s)
+	if i := strings.Index(s, " "); i >= 0 {
+		return s[:i]
+	}
+	return s
+}

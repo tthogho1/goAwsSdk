@@ -57,6 +57,17 @@ go build -ldflags="-H=windowsgui" -o ec2viewer.exe .
 1. Launch the app
 2. Select or enter an AWS profile in the profile field (default: `default`)
 3. Press the "Fetch" button to display the list of EC2 instances in the table
+4. Click an instance ID to open the Detail panel, then press "Edit SGs" to edit its security groups:
+   - **Attached**: check the security groups (from the instance's VPC) that should be attached and press "Apply".
+     Instances with more than one network interface can't be changed this way (AWS restriction).
+   - **Rules for**: pick an attached security group to see its inbound/outbound rules.
+     IPv4 CIDR rules can be deleted ("Delete", then "Confirm?"); IPv6, security-group and prefix-list rules are read-only.
+   - **Add rule**: choose ingress/egress and protocol (click to cycle), enter From/To ports
+     (ICMP: type/code, empty = all), an IPv4 CIDR and an optional description, then press "Add".
+     Security group changes apply to every instance using that group.
+   - **New SG**: enter a name (and optionally a description) and press "Create" to create a security group in the
+     instance's VPC. With "attach to this instance" checked (default) it is added to the instance's current groups
+     and selected, so you can add inbound rules right away. AWS gives a new group an "allow all" outbound rule and no inbound rules.
 
 ## Notes
 

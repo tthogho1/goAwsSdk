@@ -78,6 +78,39 @@ type AppState struct {
 	CfnEditor    widget.Editor // read-only template preview
 	Cfn          model.CfnResult
 
+	// Security group editing panel (opened from the Detail panel)
+	SGEditBtn     widget.Clickable // "Edit SGs" in the Detail panel header
+	SGPanelOpen   bool
+	SGCloseBtn    widget.Clickable
+	SGInstanceID  string
+	SGVpcID       string
+	SGAttached    []string          // IDs currently attached to the instance
+	SGAll         []model.SGSummary // all SGs in the instance's VPC
+	SGAttachBoxes []widget.Bool     // parallel to SGAll
+	SGApplyBtn    widget.Clickable
+	SGSelectBtns  []widget.Clickable // parallel to SGAttached
+	SGSelected    string             // group whose rules are shown
+	SGRules       []model.SGRule
+	SGRuleDelBtns []widget.Clickable // parallel to SGRules
+	SGDelPending  int                // index awaiting delete confirmation, -1 = none
+	SGRuleList    widget.List
+	SGAttachList  widget.List // horizontal list of SG checkboxes
+	SGDirBtn      widget.Clickable
+	SGProtoBtn    widget.Clickable
+	SGNewDir      string // ingress | egress
+	SGNewProto    string // tcp | udp | icmp | all
+	SGFromEd      widget.Editor
+	SGToEd        widget.Editor
+	SGCidrEd      widget.Editor
+	SGDescEd      widget.Editor
+	SGAddBtn      widget.Clickable
+	SGErr         string
+	// Create a new SG in the instance's VPC
+	SGNewNameEd    widget.Editor
+	SGNewGroupDesc widget.Editor
+	SGCreateAttach widget.Bool // also attach the new group to the instance
+	SGCreateBtn    widget.Clickable
+
 	// Header status filter menu
 	HeaderStatusBtn      widget.Clickable
 	HeaderStatusFilter   string
