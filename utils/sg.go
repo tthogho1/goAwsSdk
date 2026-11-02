@@ -106,6 +106,14 @@ func (r SGRuleSpec) validate() error {
 	if r.Cidr == "" {
 		return fmt.Errorf("-cidr is required")
 	}
+	if p := strings.ToLower(r.Protocol); p == "tcp" || p == "udp" {
+		if r.FromPort < 0 || r.FromPort > 65535 || r.ToPort < 0 || r.ToPort > 65535 {
+			return fmt.Errorf("-from and -to must be 0-65535 for %s, got %d-%d", r.Protocol, r.FromPort, r.ToPort)
+		}
+		if r.FromPort > r.ToPort {
+			return fmt.Errorf("-from (%d) must not be greater than -to (%d)", r.FromPort, r.ToPort)
+		}
+	}
 	return nil
 }
 
@@ -176,9 +184,11 @@ func SetInstanceSecurityGroups(svc *ec2.EC2, instanceID string, groupIDs []strin
 		return fmt.Errorf("instance id (-i) is required")
 	}
 	var ids []*string
+	var clean []string
 	for _, g := range groupIDs {
 		if g = strings.TrimSpace(g); g != "" {
 			ids = append(ids, aws.String(g))
+			clean = append(clean, g)
 		}
 	}
 	if len(ids) == 0 {
@@ -190,7 +200,7 @@ func SetInstanceSecurityGroups(svc *ec2.EC2, instanceID string, groupIDs []strin
 	}); err != nil {
 		return err
 	}
-	fmt.Printf("SecurityGroupsSet: %s %s\n", instanceID, strings.Join(groupIDs, ","))
+	fmt.Printf("SecurityGroupsSet: %s %s\n", instanceID, strings.Join(clean, ","))
 	return nil
 }
 
