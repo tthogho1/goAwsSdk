@@ -39,6 +39,13 @@ func Usage() {
 	fmt.Println("awsctrl -c create -t EC2 -ami <ami id> -type <instance type> -key <string> -nerwork-interfaces <string>")
 	fmt.Println("awsctrl -c exec -exec <cmdstring> -t EC2 -i <instanceid> ")
 	fmt.Println("awsctrl -c cfn -t EC2 -i <instanceid>,<instanceid> -o <template.yaml> [-related=false]")
+	fmt.Println("awsctrl -c sglist -vpc <vpc id>")
+	fmt.Println("awsctrl -c sgrules -g <group id>")
+	fmt.Println("awsctrl -c sgadd -g <group id> -dir ingress|egress -proto tcp|udp|icmp|-1 -from <port> -to <port> -cidr <cidr> [-desc <text>]")
+	fmt.Println("awsctrl -c sgdel -g <group id> -dir ingress|egress -proto tcp|udp|icmp|-1 -from <port> -to <port> -cidr <cidr>")
+	fmt.Println("awsctrl -c sgcreate -vpc <vpc id> -n <group name> [-desc <text>]")
+	fmt.Println("awsctrl -c sgdelete -g <group id>")
+	fmt.Println("awsctrl -c setsg -t EC2 -i <instanceid> -g <group id>,<group id>")
 
 	fmt.Println()
 	fmt.Println("options detail:")
@@ -66,6 +73,13 @@ type Options struct {
 	cmdstring     *string
 	output        *string
 	related       *bool
+	sgDir         *string
+	sgProto       *string
+	sgFrom        *int64
+	sgTo          *int64
+	sgCidr        *string
+	sgDesc        *string
+	vpcID         *string
 	network       *types.NetWorkIF
 }
 
@@ -78,7 +92,7 @@ func OptionParse() Options {
 	Options.target = flag.String("t", "EC2", "target : EC2 | appRunner | local dir | ECS | SecurityGroup")
 	Options.pattern = flag.String("p", "", "regression pattern for Names of Tag")
 	Options.file = flag.String("f", "", "upload file name")
-	Options.name = flag.String("n", "", "cluster name")
+	Options.name = flag.String("n", "", "cluster name / sgcreate: group name")
 	Options.help = flag.String("h", "", "help")
 
 	Options.start = flag.String("start", "", "start time YYYY-MM-DD")
@@ -97,6 +111,14 @@ func OptionParse() Options {
 
 	Options.output = flag.String("o", "template.yaml", "output file for cfn")
 	Options.related = flag.Bool("related", true, "cfn: also include VPC, Subnet and Security Groups of the instances")
+
+	Options.sgDir = flag.String("dir", "ingress", "sgadd/sgdel: rule direction ingress | egress")
+	Options.sgProto = flag.String("proto", "tcp", "sgadd/sgdel: protocol tcp | udp | icmp | -1 (all)")
+	Options.sgFrom = flag.Int64("from", -1, "sgadd/sgdel: from port (ICMP type)")
+	Options.sgTo = flag.Int64("to", -1, "sgadd/sgdel: to port (ICMP code)")
+	Options.sgCidr = flag.String("cidr", "", "sgadd/sgdel: IPv4 CIDR, e.g. 203.0.113.5/32")
+	Options.sgDesc = flag.String("desc", "", "sgadd: rule description / sgcreate: group description")
+	Options.vpcID = flag.String("vpc", "", "sglist: VPC id")
 
 	// json部分
 	netWorkFlag := &types.NetWorkIF{Data: make(map[string]interface{})}
@@ -156,6 +178,38 @@ func main() {
 		ec2Svc := ec2.New(sess, aws.NewConfig().WithRegion(*Options.region))
 		cfnSvc := cloudformation.New(sess, aws.NewConfig().WithRegion(*Options.region))
 		if err := utils.GenerateCfnTemplate(ec2Svc, cfnSvc, instanceIds, *Options.related, *Options.output); err != nil {
+			fmt.Println("Error: " + err.Error())
+			os.Exit(1)
+		}
+	case "sglist", "sgrules", "sgadd", "sgdel", "sgcreate", "sgdelete", "setsg":
+		svc := ec2.New(sess, aws.NewConfig().WithRegion(*Options.region))
+		rule := utils.SGRuleSpec{
+			GroupID:     *Options.groupID,
+			Direction:   *Options.sgDir,
+			Protocol:    *Options.sgProto,
+			FromPort:    *Options.sgFrom,
+			ToPort:      *Options.sgTo,
+			Cidr:        *Options.sgCidr,
+			Description: *Options.sgDesc,
+		}
+		var err error
+		switch *Options.cmd {
+		case "sglist":
+			err = utils.ListSecurityGroups(svc, *Options.vpcID)
+		case "sgrules":
+			err = utils.DescribeSecurityGroupRules(svc, *Options.groupID)
+		case "sgadd":
+			err = utils.AddSecurityGroupRule(svc, rule)
+		case "sgdel":
+			err = utils.DeleteSecurityGroupRule(svc, rule)
+		case "sgcreate":
+			err = utils.CreateSecurityGroup(svc, *Options.vpcID, *Options.name, *Options.sgDesc)
+		case "sgdelete":
+			err = utils.DeleteSecurityGroup(svc, *Options.groupID)
+		case "setsg":
+			err = utils.SetInstanceSecurityGroups(svc, *Options.instansString, strings.Split(*Options.groupID, ","))
+		}
+		if err != nil {
 			fmt.Println("Error: " + err.Error())
 			os.Exit(1)
 		}

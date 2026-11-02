@@ -67,6 +67,8 @@ func main() {
 	}
 	state.TableList.Axis = layout.Vertical
 	state.CfnRelated.Value = true
+	state.SGDelPending = -1
+	state.SGCreateAttach.Value = true
 	state.OnRowDetail = func(instanceID string) {
 		handleDetail(state, instanceID)
 	}
@@ -139,6 +141,44 @@ func run(w *app.Window, state *ui.AppState) error {
 				handleCfnSave(state)
 			}
 
+			// Security group editing
+			if state.SGEditBtn.Clicked(gtx) {
+				handleSGOpen(state)
+			}
+			if state.SGApplyBtn.Clicked(gtx) {
+				handleSGApply(state)
+			}
+			for i := range state.SGSelectBtns {
+				if state.SGSelectBtns[i].Clicked(gtx) && i < len(state.SGAttached) {
+					handleSGSelect(state, state.SGAttached[i])
+					break // handlers replace the button slices
+				}
+			}
+			for i := range state.SGRuleDelBtns {
+				if state.SGRuleDelBtns[i].Clicked(gtx) {
+					handleSGDelete(state, i)
+					break
+				}
+			}
+			if state.SGDirBtn.Clicked(gtx) {
+				handleSGToggleDir(state)
+			}
+			if state.SGProtoBtn.Clicked(gtx) {
+				handleSGCycleProto(state)
+			}
+			if state.SGAddBtn.Clicked(gtx) {
+				handleSGAdd(state)
+			}
+			if state.SGCreateBtn.Clicked(gtx) {
+				handleSGCreate(state)
+			}
+			for i := range state.SGGroupDelBtns {
+				if state.SGGroupDelBtns[i].Clicked(gtx) {
+					handleSGDeleteGroup(state, i)
+					break
+				}
+			}
+
 			// update search query each frame; mark dirty when changed
 			newQuery := strings.TrimSpace(state.SearchEditor.Text())
 			if newQuery != state.SearchQuery {
@@ -169,6 +209,9 @@ func run(w *app.Window, state *ui.AppState) error {
 				}),
 				layout.Rigid(func(gtx layout.Context) layout.Dimensions {
 					return ui.LayoutDetailPanel(gtx, th, state)
+				}),
+				layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+					return ui.LayoutSGPanel(gtx, th, state)
 				}),
 				layout.Rigid(func(gtx layout.Context) layout.Dimensions {
 					return ui.LayoutCfnPanel(gtx, th, state)

@@ -164,3 +164,74 @@ func parseCfnOutput(output string) (resources, warnings []string) {
 	}
 	return resources, warnings
 }
+
+// parseSGList parses the output of "awsctrl -c sglist ...". Expected lines:
+//
+//	SG: sg-xxxx (web-sg)
+func parseSGList(output string) []model.SGSummary {
+	var list []model.SGSummary
+	for _, line := range strings.Split(output, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if !strings.HasPrefix(trimmed, "SG:") {
+			continue
+		}
+		rest := strings.TrimSpace(strings.TrimPrefix(trimmed, "SG:"))
+		id := model.SGIDFromDetail(rest)
+		name := strings.TrimSpace(strings.TrimPrefix(rest, id))
+		name = strings.TrimSuffix(strings.TrimPrefix(name, "("), ")")
+		if id != "" {
+			list = append(list, model.SGSummary{ID: id, Name: name})
+		}
+	}
+	return list
+}
+
+// parseSGCreated returns the group ID from the output of "awsctrl -c sgcreate ...":
+//
+//	Created: sg-xxxx (web-sg)
+func parseSGCreated(output string) string {
+	for _, line := range strings.Split(output, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "Created:") {
+			return model.SGIDFromDetail(strings.TrimSpace(strings.TrimPrefix(trimmed, "Created:")))
+		}
+	}
+	return ""
+}
+
+// parseSGRules parses the output of "awsctrl -c sgrules -g ...". Expected lines:
+//
+//	Group: sg-xxxx (web-sg)
+//	Rule: ingress, tcp, 22, 22, 203.0.113.5/32, office ssh
+//	RuleOther: ingress, tcp, 443, 443, sg-yyyy
+func parseSGRules(output string) (group string, rules []model.SGRule) {
+	for _, line := range strings.Split(output, "\n") {
+		trimmed := strings.TrimSpace(line)
+		switch {
+		case strings.HasPrefix(trimmed, "Group:"):
+			group = strings.TrimSpace(strings.TrimPrefix(trimmed, "Group:"))
+		case strings.HasPrefix(trimmed, "Rule:"):
+			p := strings.SplitN(strings.TrimPrefix(trimmed, "Rule:"), ",", 6)
+			if len(p) != 6 {
+				continue
+			}
+			rules = append(rules, model.SGRule{
+				Direction: strings.TrimSpace(p[0]), Protocol: strings.TrimSpace(p[1]),
+				FromPort: strings.TrimSpace(p[2]), ToPort: strings.TrimSpace(p[3]),
+				Cidr: strings.TrimSpace(p[4]), Description: strings.TrimSpace(p[5]),
+				Editable: true,
+			})
+		case strings.HasPrefix(trimmed, "RuleOther:"):
+			p := strings.SplitN(strings.TrimPrefix(trimmed, "RuleOther:"), ",", 5)
+			if len(p) != 5 {
+				continue
+			}
+			rules = append(rules, model.SGRule{
+				Direction: strings.TrimSpace(p[0]), Protocol: strings.TrimSpace(p[1]),
+				FromPort: strings.TrimSpace(p[2]), ToPort: strings.TrimSpace(p[3]),
+				Cidr: strings.TrimSpace(p[4]),
+			})
+		}
+	}
+	return group, rules
+}
