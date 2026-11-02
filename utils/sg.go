@@ -217,3 +217,20 @@ func CreateSecurityGroup(svc *ec2.EC2, vpcID, name, description string) error {
 	fmt.Printf("Created: %s (%s)\n", strOr(res.GroupId, "None"), name)
 	return nil
 }
+
+// DeleteSecurityGroup deletes a security group. AWS refuses (DependencyViolation)
+// while it is attached to any network interface or referenced by another
+// group's rules; a VPC's "default" group can never be deleted.
+func DeleteSecurityGroup(svc *ec2.EC2, groupID string) error {
+	if groupID == "" {
+		return fmt.Errorf("security group id (-g) is required")
+	}
+	if strings.Contains(groupID, ",") {
+		return fmt.Errorf("sgdelete takes a single security group id")
+	}
+	if _, err := svc.DeleteSecurityGroup(&ec2.DeleteSecurityGroupInput{GroupId: aws.String(groupID)}); err != nil {
+		return err
+	}
+	fmt.Printf("DeletedGroup: %s\n", groupID)
+	return nil
+}

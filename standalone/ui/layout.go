@@ -919,8 +919,28 @@ func LayoutSGPanel(gtx layout.Context, th *material.Theme, s *AppState) layout.D
 						if i >= len(s.SGAttachBoxes) {
 							return layout.Dimensions{}
 						}
-						return layout.Inset{Right: unit.Dp(12)}.Layout(gtx,
-							material.CheckBox(th, &s.SGAttachBoxes[i], s.SGAll[i].Label()).Layout)
+						return layout.Inset{Right: unit.Dp(12)}.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+							return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
+								layout.Rigid(material.CheckBox(th, &s.SGAttachBoxes[i], s.SGAll[i].Label()).Layout),
+								layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+									if !s.SGCanDelete(i) || i >= len(s.SGGroupDelBtns) {
+										return layout.Dimensions{}
+									}
+									pending := s.SGGroupDelPending == s.SGAll[i].ID
+									txt := "Delete"
+									if pending {
+										txt = "Confirm?"
+									}
+									btn := material.Button(th, &s.SGGroupDelBtns[i], txt)
+									btn.Inset = layout.UniformInset(unit.Dp(2))
+									btn.TextSize = unit.Sp(12)
+									if pending {
+										btn.Background = color.NRGBA{R: 220, G: 50, B: 50, A: 255}
+									}
+									return layout.Inset{Left: unit.Dp(4)}.Layout(gtx, btn.Layout)
+								}),
+							)
+						})
 					})
 				}),
 				space,

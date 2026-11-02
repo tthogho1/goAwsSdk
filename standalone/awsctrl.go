@@ -182,6 +182,11 @@ func executeAwsCtrlSGCreate(profile, vpcID, name, description string) (string, e
 	return runAwsCtrl(args...)
 }
 
+// executeAwsCtrlSGDelete deletes a security group.
+func executeAwsCtrlSGDelete(profile, groupID string) (string, error) {
+	return runAwsCtrl("-profile", profile, "-c", "sgdelete", "-g", groupID)
+}
+
 // executeAwsCtrlSetSG replaces the security groups attached to an instance.
 func executeAwsCtrlSetSG(profile, instanceID string, groupIDs []string) (string, error) {
 	return runAwsCtrl("-profile", profile, "-c", "setsg", "-t", "EC2", "-i", instanceID, "-g", strings.Join(groupIDs, ","))

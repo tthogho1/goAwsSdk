@@ -44,6 +44,7 @@ func Usage() {
 	fmt.Println("awsctrl -c sgadd -g <group id> -dir ingress|egress -proto tcp|udp|icmp|-1 -from <port> -to <port> -cidr <cidr> [-desc <text>]")
 	fmt.Println("awsctrl -c sgdel -g <group id> -dir ingress|egress -proto tcp|udp|icmp|-1 -from <port> -to <port> -cidr <cidr>")
 	fmt.Println("awsctrl -c sgcreate -vpc <vpc id> -n <group name> [-desc <text>]")
+	fmt.Println("awsctrl -c sgdelete -g <group id>")
 	fmt.Println("awsctrl -c setsg -t EC2 -i <instanceid> -g <group id>,<group id>")
 
 	fmt.Println()
@@ -180,7 +181,7 @@ func main() {
 			fmt.Println("Error: " + err.Error())
 			os.Exit(1)
 		}
-	case "sglist", "sgrules", "sgadd", "sgdel", "sgcreate", "setsg":
+	case "sglist", "sgrules", "sgadd", "sgdel", "sgcreate", "sgdelete", "setsg":
 		svc := ec2.New(sess, aws.NewConfig().WithRegion(*Options.region))
 		rule := utils.SGRuleSpec{
 			GroupID:     *Options.groupID,
@@ -203,6 +204,8 @@ func main() {
 			err = utils.DeleteSecurityGroupRule(svc, rule)
 		case "sgcreate":
 			err = utils.CreateSecurityGroup(svc, *Options.vpcID, *Options.name, *Options.sgDesc)
+		case "sgdelete":
+			err = utils.DeleteSecurityGroup(svc, *Options.groupID)
 		case "setsg":
 			err = utils.SetInstanceSecurityGroups(svc, *Options.instansString, strings.Split(*Options.groupID, ","))
 		}

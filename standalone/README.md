@@ -68,6 +68,10 @@ go build -ldflags="-H=windowsgui" -o ec2viewer.exe .
    - **New SG**: enter a name (and optionally a description) and press "Create" to create a security group in the
      instance's VPC. With "attach to this instance" checked (default) it is added to the instance's current groups
      and selected, so you can add inbound rules right away. AWS gives a new group an "allow all" outbound rule and no inbound rules.
+   - **Detach**: uncheck a group under "Attached" and press "Apply" (at least one group must stay attached).
+   - **Delete**: groups not attached to this instance have a "Delete" button next to them (click again on "Confirm?").
+     AWS refuses while the group is attached to any other instance/network interface or referenced by another group's rule,
+     and the VPC's `default` group can't be deleted (no button is shown for it). Deletion can't be undone.
 
 ## Notes
 

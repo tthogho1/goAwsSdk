@@ -172,6 +172,12 @@ func run(w *app.Window, state *ui.AppState) error {
 			if state.SGCreateBtn.Clicked(gtx) {
 				handleSGCreate(state)
 			}
+			for i := range state.SGGroupDelBtns {
+				if state.SGGroupDelBtns[i].Clicked(gtx) {
+					handleSGDeleteGroup(state, i)
+					break
+				}
+			}
 
 			// update search query each frame; mark dirty when changed
 			newQuery := strings.TrimSpace(state.SearchEditor.Text())

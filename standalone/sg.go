@@ -56,6 +56,8 @@ func handleSGOpen(state *ui.AppState) {
 		state.SGAll = parseSGList(out)
 	}
 	state.SGAttachBoxes = make([]widget.Bool, len(state.SGAll))
+	state.SGGroupDelBtns = make([]widget.Clickable, len(state.SGAll))
+	state.SGGroupDelPending = ""
 	for i, sg := range state.SGAll {
 		state.SGAttachBoxes[i].Value = contains(state.SGAttached, sg.ID)
 	}
@@ -197,6 +199,33 @@ func handleSGCreate(state *ui.AppState) {
 	handleSGOpen(state)
 	state.ErrMsg = ""
 	state.InfoMsg = fmt.Sprintf("Created %s (%s) and attached it to %s - add inbound rules below", newID, name, state.SGInstanceID)
+}
+
+// handleSGDeleteGroup deletes SGAll[idx]. Only groups not attached to this
+// instance (and not "default") can be deleted. The first click arms the
+// button ("Confirm?"); the second click on the same group deletes it.
+func handleSGDeleteGroup(state *ui.AppState, idx int) {
+	profile := strings.TrimSpace(state.SelectedProfile)
+	if profile == "" || !state.SGCanDelete(idx) {
+		return
+	}
+	sg := state.SGAll[idx]
+	if state.SGGroupDelPending != sg.ID {
+		state.SGGroupDelPending = sg.ID
+		return
+	}
+	state.SGGroupDelPending = ""
+	if _, err := executeAwsCtrlSGDelete(profile, sg.ID); err != nil {
+		msg := fmt.Sprintf("delete %s error: %v", sg.ID, err)
+		if strings.Contains(err.Error(), "DependencyViolation") {
+			msg = fmt.Sprintf("%s is still in use (attached to another instance/network interface, or referenced by another group's rule). Detach it there first.\n%v", sg.Label(), err)
+		}
+		state.SGErr = msg
+		return
+	}
+	handleSGOpen(state) // reload the VPC's group list
+	state.ErrMsg = ""
+	state.InfoMsg = fmt.Sprintf("Deleted security group %s", sg.Label())
 }
 
 // handleSGToggleDir switches the new-rule direction between ingress and egress.
