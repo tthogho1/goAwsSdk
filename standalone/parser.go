@@ -235,3 +235,54 @@ func parseSGRules(output string) (group string, rules []model.SGRule) {
 	}
 	return group, rules
 }
+
+// parseBatchOutput parses the output of "awsctrl -c describe -t Batch [-n <queue>]"
+// (see utils/batch.go). Expected lines look like:
+//
+//	ComputeEnv: my-ce, MANAGED, ENABLED, VALID, FARGATE, 0/0/2 vCPUs
+//	JobQueue: my-queue, ENABLED, VALID, priority 1
+//	Job: <id>, <name>, SUCCEEDED, Essential container in task exited
+//
+// The job status reason is last and may contain commas.
+func parseBatchOutput(output string) ([]model.BatchComputeEnv, []model.BatchJobQueue, []model.BatchJob) {
+	var envs []model.BatchComputeEnv
+	var queues []model.BatchJobQueue
+	var jobs []model.BatchJob
+
+	fields := func(line, prefix string, n int) []string {
+		parts := strings.SplitN(strings.TrimPrefix(line, prefix), ",", n)
+		for i := range parts {
+			parts[i] = strings.TrimSpace(parts[i])
+		}
+		return parts
+	}
+
+	for _, line := range strings.Split(output, "\n") {
+		trimmed := strings.TrimSpace(line)
+		switch {
+		case strings.HasPrefix(trimmed, "ComputeEnv:"):
+			p := fields(trimmed, "ComputeEnv:", 6)
+			if len(p) != 6 {
+				continue
+			}
+			envs = append(envs, model.BatchComputeEnv{Name: p[0], Type: p[1], State: p[2], Status: p[3], ResourceType: p[4], VCPUs: p[5]})
+		case strings.HasPrefix(trimmed, "JobQueue:"):
+			p := fields(trimmed, "JobQueue:", 4)
+			if len(p) != 4 {
+				continue
+			}
+			queues = append(queues, model.BatchJobQueue{Name: p[0], State: p[1], Status: p[2], Priority: strings.TrimPrefix(p[3], "priority ")})
+		case strings.HasPrefix(trimmed, "Job:"):
+			p := fields(trimmed, "Job:", 4)
+			if len(p) < 3 {
+				continue
+			}
+			job := model.BatchJob{ID: p[0], Name: p[1], Status: p[2]}
+			if len(p) == 4 {
+				job.Reason = p[3]
+			}
+			jobs = append(jobs, job)
+		}
+	}
+	return envs, queues, jobs
+}

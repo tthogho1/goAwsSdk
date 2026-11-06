@@ -110,6 +110,30 @@ func run(w *app.Window, state *ui.AppState) error {
 		case app.FrameEvent:
 			gtx := app.NewContext(&ops, e)
 
+			// View tabs; the Batch tab loads on first open
+			if state.TabEC2Btn.Clicked(gtx) && state.ActiveTab != ui.TabEC2 {
+				state.ActiveTab = ui.TabEC2
+				state.ErrMsg, state.InfoMsg = "", ""
+			}
+			if state.TabBatchBtn.Clicked(gtx) && state.ActiveTab != ui.TabBatch {
+				state.ActiveTab = ui.TabBatch
+				state.ErrMsg, state.InfoMsg = "", ""
+				if !state.BatchLoaded {
+					handleBatchRefresh(state)
+				}
+			}
+
+			// AWS Batch view
+			if state.BatchRefreshBtn.Clicked(gtx) {
+				handleBatchRefresh(state)
+			}
+			for i := range state.BatchQueueBtns {
+				if state.BatchQueueBtns[i].Clicked(gtx) && i < len(state.BatchQueues) {
+					handleBatchSelectQueue(state, state.BatchQueues[i].Name)
+					break
+				}
+			}
+
 			// Handle "Fetch" button press
 			if state.FetchBtn.Clicked(gtx) {
 				handleFetch(state)
@@ -187,20 +211,33 @@ func run(w *app.Window, state *ui.AppState) error {
 			}
 			// search is live; editing `SearchEditor` already marks `VisibleDirty`
 
-			// Main layout: top bar + message + table
+			// Main layout: top bar + message + the active tab's view
+			topBar := layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+				return ui.LayoutTopBar(gtx, th, state)
+			})
+			message := layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+				if state.ErrMsg != "" {
+					return ui.LayoutMessage(gtx, th, state.ErrMsg, color.NRGBA{R: 220, G: 50, B: 50, A: 255})
+				}
+				if state.InfoMsg != "" {
+					return ui.LayoutMessage(gtx, th, state.InfoMsg, color.NRGBA{R: 50, G: 50, B: 200, A: 255})
+				}
+				return layout.Dimensions{}
+			})
+			if state.ActiveTab == ui.TabBatch {
+				layout.Flex{Axis: layout.Vertical}.Layout(gtx,
+					topBar,
+					message,
+					layout.Flexed(1, func(gtx layout.Context) layout.Dimensions {
+						return ui.LayoutBatchView(gtx, th, state)
+					}),
+				)
+				e.Frame(gtx.Ops)
+				continue
+			}
 			layout.Flex{Axis: layout.Vertical}.Layout(gtx,
-				layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-					return ui.LayoutTopBar(gtx, th, state)
-				}),
-				layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-					if state.ErrMsg != "" {
-						return ui.LayoutMessage(gtx, th, state.ErrMsg, color.NRGBA{R: 220, G: 50, B: 50, A: 255})
-					}
-					if state.InfoMsg != "" {
-						return ui.LayoutMessage(gtx, th, state.InfoMsg, color.NRGBA{R: 50, G: 50, B: 200, A: 255})
-					}
-					return layout.Dimensions{}
-				}),
+				topBar,
+				message,
 				layout.Rigid(func(gtx layout.Context) layout.Dimensions {
 					return ui.LayoutSearchBar(gtx, th, state)
 				}),

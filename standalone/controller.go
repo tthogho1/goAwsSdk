@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"gioui.org/widget"
 	"github.com/atotto/clipboard"
 
 	"ec2viewer/model"
@@ -253,4 +254,65 @@ func handleCfnCopy(state *ui.AppState) {
 func isDir(path string) bool {
 	fi, err := os.Stat(path)
 	return err == nil && fi.IsDir()
+}
+
+// handleBatchRefresh reloads the AWS Batch compute environments and job
+// queues, and the jobs of the selected queue if one is selected.
+func handleBatchRefresh(state *ui.AppState) {
+	profile := strings.TrimSpace(state.SelectedProfile)
+	if profile == "" {
+		state.ErrMsg = "Please select a profile"
+		state.InfoMsg = ""
+		return
+	}
+
+	output, err := executeAwsCtrlBatch(profile, "")
+	if err != nil {
+		state.ErrMsg = fmt.Sprintf("batch execution error: %v", err)
+		state.InfoMsg = ""
+		return
+	}
+	envs, queues, _ := parseBatchOutput(output)
+	state.BatchEnvs = envs
+	state.BatchQueues = queues
+	state.BatchQueueBtns = make([]widget.Clickable, len(queues))
+	state.BatchLoaded = true
+	state.ErrMsg = ""
+	state.InfoMsg = ""
+
+	// Keep showing the selected queue's jobs if the queue still exists
+	selected := state.BatchSelectedQueue
+	state.BatchSelectedQueue = ""
+	state.BatchJobs = nil
+	for _, q := range queues {
+		if q.Name == selected {
+			handleBatchSelectQueue(state, selected)
+			break
+		}
+	}
+	if len(envs) == 0 && len(queues) == 0 && state.ErrMsg == "" {
+		state.InfoMsg = "No AWS Batch compute environments or job queues found"
+	}
+}
+
+// handleBatchSelectQueue lists the jobs in a job queue.
+func handleBatchSelectQueue(state *ui.AppState, queue string) {
+	profile := strings.TrimSpace(state.SelectedProfile)
+	if profile == "" {
+		state.ErrMsg = "Please select a profile"
+		state.InfoMsg = ""
+		return
+	}
+
+	output, err := executeAwsCtrlBatch(profile, queue)
+	if err != nil {
+		state.ErrMsg = fmt.Sprintf("batch jobs error: %v", err)
+		state.InfoMsg = ""
+		return
+	}
+	_, _, jobs := parseBatchOutput(output)
+	state.BatchSelectedQueue = queue
+	state.BatchJobs = jobs
+	state.ErrMsg = ""
+	state.InfoMsg = ""
 }

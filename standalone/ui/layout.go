@@ -19,7 +19,8 @@ import (
 	"github.com/atotto/clipboard"
 )
 
-// LayoutTopBar draws the profile input field and the "Fetch"/"Execute" buttons
+// LayoutTopBar draws the view tabs, the profile menu and the buttons of the
+// active view ("Fetch"/"Execute"/... for EC2, "Refresh" for Batch)
 func LayoutTopBar(gtx layout.Context, th *material.Theme, s *AppState) layout.Dimensions {
 	// Toggle the profile menu open/closed when the profile button is clicked
 	for s.ProfileMenuBtn.Clicked(gtx) {
@@ -38,7 +39,14 @@ func LayoutTopBar(gtx layout.Context, th *material.Theme, s *AppState) layout.Di
 	return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
 		layout.Rigid(func(gtx layout.Context) layout.Dimensions {
 			return layout.UniformInset(unit.Dp(4)).Layout(gtx, func(gtx layout.Context) layout.Dimensions {
-				return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
+				children := []layout.FlexChild{
+					layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+						return tabButton(gtx, th, &s.TabEC2Btn, "EC2", s.ActiveTab == TabEC2)
+					}),
+					layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+						return tabButton(gtx, th, &s.TabBatchBtn, "Batch", s.ActiveTab == TabBatch)
+					}),
+					layout.Rigid(layout.Spacer{Width: unit.Dp(16)}.Layout),
 					layout.Rigid(func(gtx layout.Context) layout.Dimensions {
 						lbl := material.Body1(th, "Profile: ")
 						return lbl.Layout(gtx)
@@ -56,6 +64,19 @@ func LayoutTopBar(gtx layout.Context, th *material.Theme, s *AppState) layout.Di
 					layout.Flexed(1, func(gtx layout.Context) layout.Dimensions {
 						return layout.Dimensions{Size: image.Point{X: gtx.Constraints.Max.X, Y: gtx.Constraints.Min.Y}}
 					}),
+				}
+				if s.ActiveTab == TabBatch {
+					children = append(children,
+						layout.Rigid(layout.Spacer{Width: unit.Dp(8)}.Layout),
+						layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+							btn := material.Button(th, &s.BatchRefreshBtn, "Refresh")
+							btn.Inset = layout.UniformInset(unit.Dp(6))
+							return btn.Layout(gtx)
+						}),
+					)
+					return layout.Flex{Alignment: layout.Middle}.Layout(gtx, children...)
+				}
+				children = append(children,
 					layout.Rigid(layout.Spacer{Width: unit.Dp(8)}.Layout),
 					layout.Rigid(func(gtx layout.Context) layout.Dimensions {
 						btn := material.Button(th, &s.FetchBtn, "Fetch")
@@ -96,6 +117,7 @@ func LayoutTopBar(gtx layout.Context, th *material.Theme, s *AppState) layout.Di
 						return btn.Layout(gtx)
 					}),
 				)
+				return layout.Flex{Alignment: layout.Middle}.Layout(gtx, children...)
 			})
 		}),
 		layout.Rigid(func(gtx layout.Context) layout.Dimensions {
@@ -1089,4 +1111,163 @@ func drawRowBackground(gtx layout.Context, col color.NRGBA, w layout.Widget) lay
 		}),
 		layout.Stacked(w),
 	)
+}
+
+// tabButton draws one of the view tabs in the top bar; the active tab is highlighted
+func tabButton(gtx layout.Context, th *material.Theme, btn *widget.Clickable, label string, active bool) layout.Dimensions {
+	b := material.Button(th, btn, label)
+	b.Inset = layout.Inset{Top: unit.Dp(6), Bottom: unit.Dp(6), Left: unit.Dp(14), Right: unit.Dp(14)}
+	if !active {
+		b.Background = color.NRGBA{R: 225, G: 225, B: 225, A: 255}
+		b.Color = color.NRGBA{R: 60, G: 60, B: 60, A: 255}
+	}
+	return layout.Inset{Right: unit.Dp(4)}.Layout(gtx, b.Layout)
+}
+
+// batchStatusColor colors AWS Batch states/statuses: green for healthy or
+// finished, red for failures, blue for in-progress, grey for disabled.
+func batchStatusColor(status string) color.NRGBA {
+	switch status {
+	case "ENABLED", "VALID", "SUCCEEDED":
+		return color.NRGBA{R: 0, G: 130, B: 60, A: 255}
+	case "INVALID", "FAILED":
+		return color.NRGBA{R: 200, G: 40, B: 40, A: 255}
+	case "DISABLED":
+		return color.NRGBA{R: 130, G: 130, B: 130, A: 255}
+	case "SUBMITTED", "PENDING", "RUNNABLE", "STARTING", "RUNNING", "CREATING", "UPDATING":
+		return color.NRGBA{R: 0, G: 80, B: 180, A: 255}
+	}
+	return color.NRGBA{A: 255}
+}
+
+// batchCell is one table cell: text, column width (0 = take the rest) and an
+// optional text color
+type batchCell struct {
+	text  string
+	width unit.Dp
+	color *color.NRGBA
+}
+
+// LayoutBatchView draws the AWS Batch tab: compute environments, job queues
+// (click a queue to list its jobs) and the jobs of the selected queue.
+func LayoutBatchView(gtx layout.Context, th *material.Theme, s *AppState) layout.Dimensions {
+	s.BatchList.Axis = layout.Vertical
+
+	cell := func(text string, width unit.Dp) batchCell { return batchCell{text: text, width: width} }
+	status := func(text string, width unit.Dp) batchCell {
+		c := batchStatusColor(text)
+		return batchCell{text: text, width: width, color: &c}
+	}
+	drawCells := func(gtx layout.Context, bold bool, cells []batchCell) layout.Dimensions {
+		var children []layout.FlexChild
+		for _, c := range cells {
+			c := c
+			draw := func(gtx layout.Context) layout.Dimensions {
+				if c.width > 0 {
+					gtx.Constraints.Min.X = gtx.Dp(c.width)
+					gtx.Constraints.Max.X = gtx.Dp(c.width)
+				}
+				lbl := material.Body2(th, c.text)
+				lbl.MaxLines = 1
+				if bold {
+					lbl.Font.Weight = font.Bold
+				}
+				if c.color != nil {
+					lbl.Color = *c.color
+				}
+				return layout.Inset{Right: unit.Dp(8)}.Layout(gtx, lbl.Layout)
+			}
+			if c.width > 0 {
+				children = append(children, layout.Rigid(draw))
+			} else {
+				children = append(children, layout.Flexed(1, draw))
+			}
+		}
+		return layout.UniformInset(unit.Dp(4)).Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+			return layout.Flex{Alignment: layout.Middle}.Layout(gtx, children...)
+		})
+	}
+
+	var rows []layout.Widget
+	title := func(text string) {
+		rows = append(rows, func(gtx layout.Context) layout.Dimensions {
+			return layout.Inset{Top: unit.Dp(12), Bottom: unit.Dp(2), Left: unit.Dp(4)}.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+				lbl := material.H6(th, text)
+				return lbl.Layout(gtx)
+			})
+		})
+	}
+	header := func(cells ...batchCell) {
+		rows = append(rows, func(gtx layout.Context) layout.Dimensions {
+			return drawRowBackground(gtx, color.NRGBA{R: 230, G: 230, B: 230, A: 255}, func(gtx layout.Context) layout.Dimensions {
+				return drawCells(gtx, true, cells)
+			})
+		})
+	}
+	note := func(text string) {
+		rows = append(rows, func(gtx layout.Context) layout.Dimensions {
+			return layout.UniformInset(unit.Dp(4)).Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+				lbl := material.Body2(th, text)
+				lbl.Color = color.NRGBA{R: 110, G: 110, B: 110, A: 255}
+				return lbl.Layout(gtx)
+			})
+		})
+	}
+
+	if !s.BatchLoaded {
+		note("Press Refresh to load AWS Batch resources.")
+	} else {
+		title("Compute Environments")
+		header(cell("Name", 240), cell("Type", 100), cell("State", 100), cell("Status", 100), cell("Resource", 120), cell("Min/Desired/Max", 0))
+		if len(s.BatchEnvs) == 0 {
+			note("(none)")
+		}
+		for _, e := range s.BatchEnvs {
+			cells := []batchCell{cell(e.Name, 240), cell(e.Type, 100), status(e.State, 100), status(e.Status, 100), cell(e.ResourceType, 120), cell(e.VCPUs, 0)}
+			rows = append(rows, func(gtx layout.Context) layout.Dimensions { return drawCells(gtx, false, cells) })
+		}
+
+		title("Job Queues")
+		note("Click a queue to list its jobs.")
+		header(cell("Name", 240), cell("State", 100), cell("Status", 100), cell("Priority", 0))
+		if len(s.BatchQueues) == 0 {
+			note("(none)")
+		}
+		for i, q := range s.BatchQueues {
+			if i >= len(s.BatchQueueBtns) {
+				break
+			}
+			btn := &s.BatchQueueBtns[i]
+			selected := q.Name == s.BatchSelectedQueue
+			cells := []batchCell{cell(q.Name, 240), status(q.State, 100), status(q.Status, 100), cell(q.Priority, 0)}
+			rows = append(rows, func(gtx layout.Context) layout.Dimensions {
+				return btn.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+					if selected {
+						return drawRowBackground(gtx, color.NRGBA{R: 220, G: 235, B: 255, A: 255}, func(gtx layout.Context) layout.Dimensions {
+							return drawCells(gtx, true, cells)
+						})
+					}
+					return drawCells(gtx, false, cells)
+				})
+			})
+		}
+
+		if s.BatchSelectedQueue != "" {
+			title("Jobs: " + s.BatchSelectedQueue)
+			header(cell("Job ID", 320), cell("Name", 300), cell("Status", 110), cell("Reason", 0))
+			if len(s.BatchJobs) == 0 {
+				note("(no jobs; finished jobs are kept for about 7 days)")
+			}
+			for _, j := range s.BatchJobs {
+				cells := []batchCell{cell(j.ID, 320), cell(j.Name, 300), status(j.Status, 110), cell(j.Reason, 0)}
+				rows = append(rows, func(gtx layout.Context) layout.Dimensions { return drawCells(gtx, false, cells) })
+			}
+		}
+	}
+
+	return layout.UniformInset(unit.Dp(4)).Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+		return material.List(th, &s.BatchList).Layout(gtx, len(rows), func(gtx layout.Context, i int) layout.Dimensions {
+			return rows[i](gtx)
+		})
+	})
 }
