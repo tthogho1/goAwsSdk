@@ -11,6 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/apprunner"
+	"github.com/aws/aws-sdk-go/service/batch"
 	"github.com/aws/aws-sdk-go/service/cloudformation"
 	"github.com/aws/aws-sdk-go/service/costexplorer"
 	"github.com/aws/aws-sdk-go/service/ec2"
@@ -34,6 +35,9 @@ func Usage() {
 	fmt.Println("awsctrl -c S3upload -b <bucketName> -f <localfile>")
 	fmt.Println("awsctrl -c S3upload -b <bucketName> -t <localdir>")
 	fmt.Println("awsctrl -c describe -t ECS -n <cluster>")
+	fmt.Println("awsctrl -c describe -t Batch [-n <job queue>]")
+	fmt.Println("awsctrl -c up|down -t Batch -n <compute environment>")
+	fmt.Println("awsctrl -c submit -t Batch -n <job queue> -jobdef <job definition[:revision]> [-jobname <name>]")
 	fmt.Println("awsctrl -c cost -start <YYYY-MM-DD> -end <YYYY-MM-DD>")
 	fmt.Println("awsctrl -c detail -t EC2 -i <instanceid>")
 	fmt.Println("awsctrl -c create -t EC2 -ami <ami id> -type <instance type> -key <string> -nerwork-interfaces <string>")
@@ -80,6 +84,8 @@ type Options struct {
 	sgCidr        *string
 	sgDesc        *string
 	vpcID         *string
+	jobDef        *string
+	jobName       *string
 	network       *types.NetWorkIF
 }
 
@@ -88,11 +94,11 @@ func OptionParse() Options {
 	Options := Options{}
 	Options.profile = flag.String("profile", "default", "Specifiy Credential profile")
 	Options.region = flag.String("region", "ap-northeast-1", "Specify AWS region")
-	Options.cmd = flag.String("c", "describe", "command : describe | up |down | S3download | AMI |exec | cfn")
-	Options.target = flag.String("t", "EC2", "target : EC2 | appRunner | local dir | ECS | SecurityGroup")
+	Options.cmd = flag.String("c", "describe", "command : describe | up |down | S3download | AMI |exec | cfn | submit")
+	Options.target = flag.String("t", "EC2", "target : EC2 | appRunner | local dir | ECS | Batch | SecurityGroup")
 	Options.pattern = flag.String("p", "", "regression pattern for Names of Tag")
 	Options.file = flag.String("f", "", "upload file name")
-	Options.name = flag.String("n", "", "cluster name / sgcreate: group name")
+	Options.name = flag.String("n", "", "cluster name / Batch: job queue or compute environment / sgcreate: group name")
 	Options.help = flag.String("h", "", "help")
 
 	Options.start = flag.String("start", "", "start time YYYY-MM-DD")
@@ -119,6 +125,9 @@ func OptionParse() Options {
 	Options.sgCidr = flag.String("cidr", "", "sgadd/sgdel: IPv4 CIDR, e.g. 203.0.113.5/32")
 	Options.sgDesc = flag.String("desc", "", "sgadd: rule description / sgcreate: group description")
 	Options.vpcID = flag.String("vpc", "", "sglist: VPC id")
+
+	Options.jobDef = flag.String("jobdef", "", "submit: Batch job definition name[:revision]")
+	Options.jobName = flag.String("jobname", "", "submit: Batch job name (default: <jobdef>-<timestamp>)")
 
 	// json部分
 	netWorkFlag := &types.NetWorkIF{Data: make(map[string]interface{})}
@@ -213,6 +222,16 @@ func main() {
 			fmt.Println("Error: " + err.Error())
 			os.Exit(1)
 		}
+	case "submit":
+		if *Options.target != "Batch" {
+			fmt.Println("submit target " + *Options.target + " is Invalid")
+			os.Exit(1)
+		}
+		svc := batch.New(sess, aws.NewConfig().WithRegion(*Options.region))
+		if err := utils.SubmitBatchJob(svc, *Options.name, *Options.jobDef, *Options.jobName); err != nil {
+			fmt.Println("Error: " + err.Error())
+			os.Exit(1)
+		}
 	case "cost":
 		svc := costexplorer.New(sess)
 		utils.Cost(svc, *Options.start, *Options.end)
@@ -237,6 +256,13 @@ func main() {
 			svc := ecs.New(sess, aws.NewConfig().WithRegion(*Options.region))
 			utils.DescribeECS(svc, Options.name)
 
+		} else if *Options.target == "Batch" {
+			svc := batch.New(sess, aws.NewConfig().WithRegion(*Options.region))
+			if err := utils.DescribeBatch(svc, *Options.name); err != nil {
+				fmt.Println("Error: " + err.Error())
+				os.Exit(1)
+			}
+
 		} else if *Options.target == "AMI" {
 			svc := ec2.New(sess, aws.NewConfig().WithRegion(*Options.region))
 			utils.DescribeAMI(svc, Options.pattern)
@@ -255,6 +281,12 @@ func main() {
 		} else if *Options.target == "appRunner" {
 			svc := apprunner.New(sess, aws.NewConfig().WithRegion(*Options.region))
 			utils.UpAppRunner(svc, Options.serviceArn)
+		} else if *Options.target == "Batch" {
+			svc := batch.New(sess, aws.NewConfig().WithRegion(*Options.region))
+			if err := utils.SetBatchComputeEnvironmentState(svc, *Options.name, true); err != nil {
+				fmt.Println("Error: " + err.Error())
+				os.Exit(1)
+			}
 		}
 	case "down":
 		if *Options.target == "EC2" {
@@ -263,6 +295,12 @@ func main() {
 		} else if *Options.target == "appRunner" {
 			svc := apprunner.New(sess, aws.NewConfig().WithRegion(*Options.region))
 			utils.DownAppRunner(svc, Options.serviceArn)
+		} else if *Options.target == "Batch" {
+			svc := batch.New(sess, aws.NewConfig().WithRegion(*Options.region))
+			if err := utils.SetBatchComputeEnvironmentState(svc, *Options.name, false); err != nil {
+				fmt.Println("Error: " + err.Error())
+				os.Exit(1)
+			}
 		} else if *Options.target == "ECS" {
 			svc := ecs.New(sess, aws.NewConfig().WithRegion(*Options.region))
 			utils.DownECS(svc, Options.name)

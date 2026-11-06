@@ -40,7 +40,7 @@ cd sample-s3-list && go build ./...
 
 ### `awsctrl` (root)
 - `AwsCtrl.go` holds all flag parsing (`OptionParse`) and a `switch` on `-c` (command) and then `-t` (target) that builds the right aws-sdk-go v1 service client and calls into `utils/`.
-- `utils/` holds one file per area (`describe.go`, `updown.go`, `create.go`, `exec.go` via SSM, `s3.go`, `cost.go`, `cfn.go`, `sg.go` for security group listing/rule editing/attachment). The functions print results straight to stdout rather than returning them (`sg.go` also returns errors so `AwsCtrl.go` can exit 1).
+- `utils/` holds one file per area (`describe.go`, `updown.go`, `create.go`, `exec.go` via SSM, `s3.go`, `cost.go`, `cfn.go`, `batch.go` for AWS Batch compute environments/job queues/jobs, `sg.go` for security group listing/rule editing/attachment). The functions print results straight to stdout rather than returning them (`sg.go` and `batch.go` also return errors so `AwsCtrl.go` can exit 1).
 - `types/common.go` defines `NetWorkIF`, a `flag.Value` that parses the `-network-interfaces` JSON for `create`.
 - The default region is `ap-northeast-1`. Credentials come from shared-config profiles (`-profile`).
 - The README's usage section is partly out of date. The `Usage()` function in `AwsCtrl.go` lists the real commands.
@@ -53,6 +53,7 @@ The GUI does **not** call AWS itself. It runs the `awsctrl` executable (path fro
 - **If you change a `fmt.Printf` format in `utils/`, update `standalone/parser.go` to match.** Otherwise the GUI breaks without any error.
 - CFn generation is the one long-running action: `startCfn` runs awsctrl in a goroutine and sends the result on a channel that the event loop in `main.go` drains each frame (`applyCfnResult`). The goroutine must not touch `AppState`.
 - `sg.go` holds the security group panel handlers (opened via "Edit SGs" in the Detail panel), which call `sglist` / `sgrules` / `sgadd` / `sgdel` / `sgcreate` / `sgdelete` / `setsg`. Create + attach is `sgcreate` followed by `setsg` with the current groups plus the new one. Rule and group deletion are two-click confirms; only groups not attached to the instance (and not `default`) get a group Delete button.
+- The top bar has **EC2 | Batch** tabs (`ui.TabEC2` / `ui.TabBatch`) that switch the whole view; the profile picker is shared. The Batch tab (`LayoutBatchView`, handlers `handleBatchRefresh` / `handleBatchSelectQueue`) runs `describe -t Batch [-n <queue>]` and parses the `ComputeEnv:` / `JobQueue:` / `Job:` lines printed by `utils/batch.go` (`parseBatchOutput`; the job reason is last because it may contain commas).
 - `controller.go` holds the button handlers (Fetch / Execute up-down diff / Cost / Detail), which change `ui.AppState`. `ui/layout.go` and `ui/state.go` hold the Gio immediate-mode layout and the state. `model/` holds the plain data structs.
 - `awsprofiles.go` fills the profile picker from `~/.aws/credentials` and `~/.aws/config`.
 - Platform-specific code uses `_windows.go` / `_other.go` build-tag pairs: hiding the child-process console window, and showing startup errors in a MessageBox (the Windows build has no console). Startup failures go through `fatalStartup` so the user sees them instead of the app exiting silently.

@@ -18,8 +18,19 @@ var ColWidths = []unit.Dp{180, 80, 100, 220, 130, 160, 60, 60}
 // SelectCol is the index of the "Select" checkbox column used for CFn generation
 const SelectCol = 7
 
+// Top-level views, switched with the tab buttons in the top bar
+const (
+	TabEC2 = iota
+	TabBatch
+)
+
 // AppState is a struct that centrally manages the UI and data state
 type AppState struct {
+	// View tabs
+	ActiveTab   int // TabEC2 | TabBatch
+	TabEC2Btn   widget.Clickable
+	TabBatchBtn widget.Clickable
+
 	// Instance data
 	Instances      []model.Instance
 	OriginalStatus []string
@@ -112,6 +123,16 @@ type AppState struct {
 	SGNewGroupDesc widget.Editor
 	SGCreateAttach widget.Bool // also attach the new group to the instance
 	SGCreateBtn    widget.Clickable
+
+	// AWS Batch view (TabBatch)
+	BatchRefreshBtn    widget.Clickable
+	BatchLoaded        bool // false until the first load, so the tab loads on first open
+	BatchEnvs          []model.BatchComputeEnv
+	BatchQueues        []model.BatchJobQueue
+	BatchQueueBtns     []widget.Clickable // parallel to BatchQueues; click to list jobs
+	BatchSelectedQueue string             // queue whose jobs are shown
+	BatchJobs          []model.BatchJob
+	BatchList          widget.List
 
 	// Header status filter menu
 	HeaderStatusBtn      widget.Clickable

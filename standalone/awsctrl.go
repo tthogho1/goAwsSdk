@@ -125,6 +125,23 @@ func executeAwsCtrlDetail(profile, instanceID string) (string, error) {
 	return string(out), nil
 }
 
+// executeAwsCtrlBatch runs "describe -t Batch". With an empty jobQueue it
+// lists compute environments and job queues; otherwise the jobs in jobQueue.
+func executeAwsCtrlBatch(profile, jobQueue string) (string, error) {
+	args := []string{"-profile", profile, "-c", "describe", "-t", "Batch"}
+	if jobQueue != "" {
+		args = append(args, "-n", jobQueue)
+	}
+	cmd := exec.Command(awsctrlPath, args...)
+	setHideWindow(cmd)
+
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("%v\n%s", err, string(out))
+	}
+	return string(out), nil
+}
+
 // executeAwsCtrlCfn runs the "cfn" subcommand of awsctrl, which generates a
 // CloudFormation template for the given instances and writes it to outPath.
 func executeAwsCtrlCfn(profile string, instanceIDs []string, related bool, outPath string) (string, error) {
