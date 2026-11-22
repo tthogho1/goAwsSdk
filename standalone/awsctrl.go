@@ -169,6 +169,15 @@ func runAwsCtrl(args ...string) (string, error) {
 	return string(out), nil
 }
 
+// executeAwsCtrlSubnets runs "describe -t Subnet" (all subnets if vpcID is empty).
+func executeAwsCtrlSubnets(profile, vpcID string) (string, error) {
+	args := []string{"-profile", profile, "-c", "describe", "-t", "Subnet"}
+	if vpcID != "" {
+		args = append(args, "-vpc", vpcID)
+	}
+	return runAwsCtrl(args...)
+}
+
 // executeAwsCtrlSGList lists the security groups of a VPC.
 func executeAwsCtrlSGList(profile, vpcID string) (string, error) {
 	return runAwsCtrl("-profile", profile, "-c", "sglist", "-vpc", vpcID)

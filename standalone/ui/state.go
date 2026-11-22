@@ -22,14 +22,16 @@ const SelectCol = 7
 const (
 	TabEC2 = iota
 	TabBatch
+	TabSubnet
 )
 
 // AppState is a struct that centrally manages the UI and data state
 type AppState struct {
 	// View tabs
-	ActiveTab   int // TabEC2 | TabBatch
-	TabEC2Btn   widget.Clickable
-	TabBatchBtn widget.Clickable
+	ActiveTab    int // TabEC2 | TabBatch | TabSubnet
+	TabEC2Btn    widget.Clickable
+	TabBatchBtn  widget.Clickable
+	TabSubnetBtn widget.Clickable
 
 	// Instance data
 	Instances      []model.Instance
@@ -133,6 +135,14 @@ type AppState struct {
 	BatchSelectedQueue string             // queue whose jobs are shown
 	BatchJobs          []model.BatchJob
 	BatchList          widget.List
+
+	// Subnets view (TabSubnet)
+	SubnetRefreshBtn widget.Clickable
+	SubnetLoaded     bool          // false until the first load, so the tab loads on first open
+	SubnetVpcEd      widget.Editor // optional VPC id filter
+	SubnetLoadedVpc  string        // VPC filter used for the shown list ("" = all)
+	Subnets          []model.Subnet
+	SubnetList       widget.List
 
 	// Header status filter menu
 	HeaderStatusBtn      widget.Clickable

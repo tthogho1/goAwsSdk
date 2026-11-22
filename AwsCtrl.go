@@ -30,6 +30,7 @@ func Usage() {
 	fmt.Println("awsctrl -c describe -t AMI ")
 	fmt.Println("awsctrl -c describe -t SecurityGroup ")
 	fmt.Println("awsctrl -c describe -t IAM [-p <role name regexp>]")
+	fmt.Println("awsctrl -c describe -t Subnet [-vpc <vpc id>]")
 	fmt.Println("awsctrl -c appRunner -t EC2 -i <instanceid>")
 	fmt.Println("awsctrl -c up -t EC2 -i <instanceid>")
 	fmt.Println("awsctrl -c up -t appRunner -s <service arn>")
@@ -99,7 +100,7 @@ func OptionParse() Options {
 	Options.profile = flag.String("profile", "default", "Specifiy Credential profile")
 	Options.region = flag.String("region", "ap-northeast-1", "Specify AWS region")
 	Options.cmd = flag.String("c", "describe", "command : describe | up |down | S3download | AMI |exec | cfn | submit")
-	Options.target = flag.String("t", "EC2", "target : EC2 | appRunner | local dir | ECS | Batch | SecurityGroup | IAM")
+	Options.target = flag.String("t", "EC2", "target : EC2 | appRunner | local dir | ECS | Batch | SecurityGroup | IAM | Subnet")
 	Options.pattern = flag.String("p", "", "regression pattern for Names of Tag")
 	Options.file = flag.String("f", "", "upload file name")
 	Options.name = flag.String("n", "", "cluster name / Batch: job queue or compute environment / sgcreate: group name / detail -t IAM: role name")
@@ -128,7 +129,7 @@ func OptionParse() Options {
 	Options.sgTo = flag.Int64("to", -1, "sgadd/sgdel: to port (ICMP code)")
 	Options.sgCidr = flag.String("cidr", "", "sgadd/sgdel: IPv4 CIDR, e.g. 203.0.113.5/32")
 	Options.sgDesc = flag.String("desc", "", "sgadd: rule description / sgcreate: group description")
-	Options.vpcID = flag.String("vpc", "", "sglist: VPC id")
+	Options.vpcID = flag.String("vpc", "", "sglist / sgcreate / describe -t Subnet: VPC id")
 
 	Options.jobDef = flag.String("jobdef", "", "submit: Batch job definition name[:revision]")
 	Options.jobName = flag.String("jobname", "", "submit: Batch job name (default: <jobdef>-<timestamp>)")
@@ -285,6 +286,13 @@ func main() {
 		} else if *Options.target == "SecurityGroup" {
 			svc := ec2.New(sess, aws.NewConfig().WithRegion(*Options.region))
 			utils.DescribeSecurityGroup(svc, Options.groupID)
+
+		} else if strings.EqualFold(*Options.target, "Subnet") {
+			svc := ec2.New(sess, aws.NewConfig().WithRegion(*Options.region))
+			if err := utils.DescribeSubnets(svc, *Options.vpcID); err != nil {
+				fmt.Println("Error: " + err.Error())
+				os.Exit(1)
+			}
 
 		} else if *Options.target == "IAM" {
 			svc := iam.New(sess)

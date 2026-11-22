@@ -123,6 +123,28 @@ func run(w *app.Window, state *ui.AppState) error {
 				}
 			}
 
+			if state.TabSubnetBtn.Clicked(gtx) && state.ActiveTab != ui.TabSubnet {
+				state.ActiveTab = ui.TabSubnet
+				state.ErrMsg, state.InfoMsg = "", ""
+				if !state.SubnetLoaded {
+					handleSubnetRefresh(state)
+				}
+			}
+
+			// Subnets view: Refresh button or Enter in the VPC filter box
+			if state.SubnetRefreshBtn.Clicked(gtx) {
+				handleSubnetRefresh(state)
+			}
+			for {
+				ev, ok := state.SubnetVpcEd.Update(gtx)
+				if !ok {
+					break
+				}
+				if _, ok := ev.(widget.SubmitEvent); ok {
+					handleSubnetRefresh(state)
+				}
+			}
+
 			// AWS Batch view
 			if state.BatchRefreshBtn.Clicked(gtx) {
 				handleBatchRefresh(state)
@@ -230,6 +252,17 @@ func run(w *app.Window, state *ui.AppState) error {
 					message,
 					layout.Flexed(1, func(gtx layout.Context) layout.Dimensions {
 						return ui.LayoutBatchView(gtx, th, state)
+					}),
+				)
+				e.Frame(gtx.Ops)
+				continue
+			}
+			if state.ActiveTab == ui.TabSubnet {
+				layout.Flex{Axis: layout.Vertical}.Layout(gtx,
+					topBar,
+					message,
+					layout.Flexed(1, func(gtx layout.Context) layout.Dimensions {
+						return ui.LayoutSubnetView(gtx, th, state)
 					}),
 				)
 				e.Frame(gtx.Ops)
