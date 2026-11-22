@@ -40,7 +40,7 @@ cd sample-s3-list && go build ./...
 
 ### `awsctrl` (root)
 - `AwsCtrl.go` holds all flag parsing (`OptionParse`) and a `switch` on `-c` (command) and then `-t` (target) that builds the right aws-sdk-go v1 service client and calls into `utils/`.
-- `utils/` holds one file per area (`describe.go`, `updown.go`, `create.go`, `exec.go` via SSM, `s3.go`, `cost.go`, `cfn.go`, `batch.go` for AWS Batch compute environments/job queues/jobs, `sg.go` for security group listing/rule editing/attachment). The functions print results straight to stdout rather than returning them (`sg.go` and `batch.go` also return errors so `AwsCtrl.go` can exit 1).
+- `utils/` holds one file per area (`describe.go`, `updown.go`, `create.go`, `exec.go` via SSM, `s3.go`, `cost.go`, `cfn.go`, `batch.go` for AWS Batch compute environments/job queues/jobs, `sg.go` for security group listing/rule editing/attachment, `iam.go` for IAM role listing and `detail -t IAM` role JSON). The functions print results straight to stdout rather than returning them (`sg.go`, `batch.go` and `iam.go` also return errors so `AwsCtrl.go` can exit 1).
 - `types/common.go` defines `NetWorkIF`, a `flag.Value` that parses the `-network-interfaces` JSON for `create`.
 - The default region is `ap-northeast-1`. Credentials come from shared-config profiles (`-profile`).
 - The README's usage section is partly out of date. The `Usage()` function in `AwsCtrl.go` lists the real commands.
