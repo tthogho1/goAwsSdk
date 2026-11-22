@@ -236,6 +236,36 @@ func parseSGRules(output string) (group string, rules []model.SGRule) {
 	return group, rules
 }
 
+// parseSubnetOutput parses the output of "awsctrl -c describe -t Subnet"
+// (see utils/describe.go). Expected lines look like:
+//
+//	Subnet: subnet-xxx, vpc-xxx, 10.0.1.0/24, ap-northeast-1a, available, 251, default=false, publicIP=true, Name=web-a
+//
+// The name is last and may contain commas.
+func parseSubnetOutput(output string) []model.Subnet {
+	var list []model.Subnet
+	for _, line := range strings.Split(output, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if !strings.HasPrefix(trimmed, "Subnet:") {
+			continue
+		}
+		p := strings.SplitN(strings.TrimPrefix(trimmed, "Subnet:"), ",", 9)
+		if len(p) != 9 {
+			continue
+		}
+		for i := range p {
+			p[i] = strings.TrimSpace(p[i])
+		}
+		list = append(list, model.Subnet{
+			ID: p[0], VpcID: p[1], Cidr: p[2], AZ: p[3], State: p[4], AvailableIPs: p[5],
+			Default:  strings.TrimPrefix(p[6], "default=") == "true",
+			PublicIP: strings.TrimPrefix(p[7], "publicIP=") == "true",
+			Name:     strings.TrimPrefix(p[8], "Name="),
+		})
+	}
+	return list
+}
+
 // parseBatchOutput parses the output of "awsctrl -c describe -t Batch [-n <queue>]"
 // (see utils/batch.go). Expected lines look like:
 //

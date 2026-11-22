@@ -295,6 +295,37 @@ func handleBatchRefresh(state *ui.AppState) {
 	}
 }
 
+// handleSubnetRefresh reloads the subnet list, filtered by the VPC id in the
+// Subnets tab's filter box (all subnets when it is empty).
+func handleSubnetRefresh(state *ui.AppState) {
+	profile := strings.TrimSpace(state.SelectedProfile)
+	if profile == "" {
+		state.ErrMsg = "Please select a profile"
+		state.InfoMsg = ""
+		return
+	}
+
+	vpcID := strings.TrimSpace(state.SubnetVpcEd.Text())
+	output, err := executeAwsCtrlSubnets(profile, vpcID)
+	if err != nil {
+		state.ErrMsg = fmt.Sprintf("subnet list error: %v", err)
+		state.InfoMsg = ""
+		return
+	}
+	state.Subnets = parseSubnetOutput(output)
+	state.SubnetLoaded = true
+	state.SubnetLoadedVpc = vpcID
+	state.ErrMsg = ""
+	state.InfoMsg = ""
+	if len(state.Subnets) == 0 {
+		if vpcID != "" {
+			state.InfoMsg = "No subnets found in " + vpcID
+		} else {
+			state.InfoMsg = "No subnets found"
+		}
+	}
+}
+
 // handleBatchSelectQueue lists the jobs in a job queue.
 func handleBatchSelectQueue(state *ui.AppState, queue string) {
 	profile := strings.TrimSpace(state.SelectedProfile)

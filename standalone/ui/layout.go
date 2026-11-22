@@ -46,6 +46,9 @@ func LayoutTopBar(gtx layout.Context, th *material.Theme, s *AppState) layout.Di
 					layout.Rigid(func(gtx layout.Context) layout.Dimensions {
 						return tabButton(gtx, th, &s.TabBatchBtn, "Batch", s.ActiveTab == TabBatch)
 					}),
+					layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+						return tabButton(gtx, th, &s.TabSubnetBtn, "Subnets", s.ActiveTab == TabSubnet)
+					}),
 					layout.Rigid(layout.Spacer{Width: unit.Dp(16)}.Layout),
 					layout.Rigid(func(gtx layout.Context) layout.Dimensions {
 						lbl := material.Body1(th, "Profile: ")
@@ -65,11 +68,32 @@ func LayoutTopBar(gtx layout.Context, th *material.Theme, s *AppState) layout.Di
 						return layout.Dimensions{Size: image.Point{X: gtx.Constraints.Max.X, Y: gtx.Constraints.Min.Y}}
 					}),
 				}
-				if s.ActiveTab == TabBatch {
+				if s.ActiveTab == TabBatch || s.ActiveTab == TabSubnet {
+					refreshBtn := &s.BatchRefreshBtn
+					if s.ActiveTab == TabSubnet {
+						refreshBtn = &s.SubnetRefreshBtn
+						children = append(children,
+							layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+								return material.Body1(th, "VPC: ").Layout(gtx)
+							}),
+							layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+								gtx.Constraints.Min.X = gtx.Dp(unit.Dp(200))
+								gtx.Constraints.Max.X = gtx.Dp(unit.Dp(200))
+								s.SubnetVpcEd.SingleLine = true
+								s.SubnetVpcEd.Submit = true
+								ed := material.Editor(th, &s.SubnetVpcEd, "vpc-... (empty = all)")
+								return widget.Border{
+									Color: color.NRGBA{R: 180, G: 180, B: 180, A: 255}, Width: unit.Dp(1), CornerRadius: unit.Dp(2),
+								}.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+									return layout.UniformInset(unit.Dp(4)).Layout(gtx, ed.Layout)
+								})
+							}),
+						)
+					}
 					children = append(children,
 						layout.Rigid(layout.Spacer{Width: unit.Dp(8)}.Layout),
 						layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-							btn := material.Button(th, &s.BatchRefreshBtn, "Refresh")
+							btn := material.Button(th, refreshBtn, "Refresh")
 							btn.Inset = layout.UniformInset(unit.Dp(6))
 							return btn.Layout(gtx)
 						}),
@@ -1148,6 +1172,117 @@ type batchCell struct {
 	color *color.NRGBA
 }
 
+// drawCellRow draws one table row of fixed-width cells (a width of 0 takes
+// the remaining space). Shared by the Batch and Subnets views.
+func drawCellRow(gtx layout.Context, th *material.Theme, bold bool, cells []batchCell) layout.Dimensions {
+	var children []layout.FlexChild
+	for _, c := range cells {
+		c := c
+		draw := func(gtx layout.Context) layout.Dimensions {
+			if c.width > 0 {
+				gtx.Constraints.Min.X = gtx.Dp(c.width)
+				gtx.Constraints.Max.X = gtx.Dp(c.width)
+			}
+			lbl := material.Body2(th, c.text)
+			lbl.MaxLines = 1
+			if bold {
+				lbl.Font.Weight = font.Bold
+			}
+			if c.color != nil {
+				lbl.Color = *c.color
+			}
+			return layout.Inset{Right: unit.Dp(8)}.Layout(gtx, lbl.Layout)
+		}
+		if c.width > 0 {
+			children = append(children, layout.Rigid(draw))
+		} else {
+			children = append(children, layout.Flexed(1, draw))
+		}
+	}
+	return layout.UniformInset(unit.Dp(4)).Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+		return layout.Flex{Alignment: layout.Middle}.Layout(gtx, children...)
+	})
+}
+
+// LayoutSubnetView draws the Subnets tab: one row per subnet, with a shaded
+// band for every other VPC so subnets of the same VPC read as a group.
+func LayoutSubnetView(gtx layout.Context, th *material.Theme, s *AppState) layout.Dimensions {
+	s.SubnetList.Axis = layout.Vertical
+
+	cell := func(text string, width unit.Dp) batchCell { return batchCell{text: text, width: width} }
+	yesNo := func(b bool) string {
+		if b {
+			return "yes"
+		}
+		return "-"
+	}
+	green := color.NRGBA{R: 0, G: 130, B: 60, A: 255}
+	blue := color.NRGBA{R: 0, G: 80, B: 180, A: 255}
+
+	var rows []layout.Widget
+	note := func(text string) {
+		rows = append(rows, func(gtx layout.Context) layout.Dimensions {
+			return layout.UniformInset(unit.Dp(4)).Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+				lbl := material.Body2(th, text)
+				lbl.Color = color.NRGBA{R: 110, G: 110, B: 110, A: 255}
+				return lbl.Layout(gtx)
+			})
+		})
+	}
+
+	if !s.SubnetLoaded {
+		note("Press Refresh to load subnets.")
+	} else {
+		title := fmt.Sprintf("Subnets (%d)", len(s.Subnets))
+		if s.SubnetLoadedVpc != "" {
+			title += " in " + s.SubnetLoadedVpc
+		}
+		rows = append(rows, func(gtx layout.Context) layout.Dimensions {
+			return layout.Inset{Top: unit.Dp(8), Bottom: unit.Dp(2), Left: unit.Dp(4)}.Layout(gtx, material.H6(th, title).Layout)
+		})
+		header := []batchCell{cell("Subnet ID", 220), cell("VPC", 200), cell("CIDR", 140), cell("AZ", 140),
+			cell("State", 90), cell("Free IPs", 80), cell("Default", 70), cell("Public IP", 80), cell("Name", 0)}
+		rows = append(rows, func(gtx layout.Context) layout.Dimensions {
+			return drawRowBackground(gtx, color.NRGBA{R: 230, G: 230, B: 230, A: 255}, func(gtx layout.Context) layout.Dimensions {
+				return drawCellRow(gtx, th, true, header)
+			})
+		})
+
+		band := false
+		prevVpc := ""
+		for i, sn := range s.Subnets {
+			if i > 0 && sn.VpcID != prevVpc {
+				band = !band
+			}
+			prevVpc = sn.VpcID
+
+			stateCell := cell(sn.State, 90)
+			if sn.State == "available" {
+				stateCell.color = &green
+			} else {
+				stateCell.color = &blue
+			}
+			cells := []batchCell{cell(sn.ID, 220), cell(sn.VpcID, 200), cell(sn.Cidr, 140), cell(sn.AZ, 140),
+				stateCell, cell(sn.AvailableIPs, 80), cell(yesNo(sn.Default), 70), cell(yesNo(sn.PublicIP), 80), cell(sn.Name, 0)}
+			shaded := band
+			rows = append(rows, func(gtx layout.Context) layout.Dimensions {
+				if shaded {
+					return drawRowBackground(gtx, color.NRGBA{R: 245, G: 248, B: 252, A: 255}, func(gtx layout.Context) layout.Dimensions {
+						return drawCellRow(gtx, th, false, cells)
+					})
+				}
+				return drawCellRow(gtx, th, false, cells)
+			})
+		}
+	}
+
+	return layout.UniformInset(unit.Dp(4)).Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+		return material.List(th, &s.SubnetList).Layout(gtx, len(rows), func(gtx layout.Context, i int) layout.Dimensions {
+			return rows[i](gtx)
+		})
+	})
+}
+
 // LayoutBatchView draws the AWS Batch tab: compute environments, job queues
 // (click a queue to list its jobs) and the jobs of the selected queue.
 func LayoutBatchView(gtx layout.Context, th *material.Theme, s *AppState) layout.Dimensions {
@@ -1159,33 +1294,7 @@ func LayoutBatchView(gtx layout.Context, th *material.Theme, s *AppState) layout
 		return batchCell{text: text, width: width, color: &c}
 	}
 	drawCells := func(gtx layout.Context, bold bool, cells []batchCell) layout.Dimensions {
-		var children []layout.FlexChild
-		for _, c := range cells {
-			c := c
-			draw := func(gtx layout.Context) layout.Dimensions {
-				if c.width > 0 {
-					gtx.Constraints.Min.X = gtx.Dp(c.width)
-					gtx.Constraints.Max.X = gtx.Dp(c.width)
-				}
-				lbl := material.Body2(th, c.text)
-				lbl.MaxLines = 1
-				if bold {
-					lbl.Font.Weight = font.Bold
-				}
-				if c.color != nil {
-					lbl.Color = *c.color
-				}
-				return layout.Inset{Right: unit.Dp(8)}.Layout(gtx, lbl.Layout)
-			}
-			if c.width > 0 {
-				children = append(children, layout.Rigid(draw))
-			} else {
-				children = append(children, layout.Flexed(1, draw))
-			}
-		}
-		return layout.UniformInset(unit.Dp(4)).Layout(gtx, func(gtx layout.Context) layout.Dimensions {
-			return layout.Flex{Alignment: layout.Middle}.Layout(gtx, children...)
-		})
+		return drawCellRow(gtx, th, bold, cells)
 	}
 
 	var rows []layout.Widget

@@ -33,6 +33,31 @@ func portStr(p *int64) string {
 	return fmt.Sprintf("%d", *p)
 }
 
+// ListVPCs prints all VPCs in the account/region. Output format:
+//
+//	VPC: vpc-xxx, <CIDR>, <state>, default=<true|false>, Name=<name or ->
+func ListVPCs(svc *ec2.EC2) error {
+	input := &ec2.DescribeVpcsInput{}
+	return svc.DescribeVpcsPages(input, func(page *ec2.DescribeVpcsOutput, _ bool) bool {
+		for _, v := range page.Vpcs {
+			name := "-"
+			for _, tag := range v.Tags {
+				if tag.Key != nil && *tag.Key == "Name" && tag.Value != nil {
+					name = *tag.Value
+					break
+				}
+			}
+			isDefault := false
+			if v.IsDefault != nil {
+				isDefault = *v.IsDefault
+			}
+			fmt.Printf("VPC: %s, %s, %s, default=%t, Name=%s\n",
+				strOr(v.VpcId, "None"), strOr(v.CidrBlock, "-"), strOr(v.State, "-"), isDefault, name)
+		}
+		return true
+	})
+}
+
 // ListSecurityGroups prints the security groups in a VPC (all groups if vpcID is empty).
 func ListSecurityGroups(svc *ec2.EC2, vpcID string) error {
 	input := &ec2.DescribeSecurityGroupsInput{}

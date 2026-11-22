@@ -16,6 +16,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/costexplorer"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/ecs"
+	"github.com/aws/aws-sdk-go/service/iam"
 	"github.com/aws/aws-sdk-go/service/s3"
 )
 
@@ -28,6 +29,8 @@ func Usage() {
 	fmt.Println("awsctrl -c describe -t EC2 -i <instanceid> <-p> <pattern>")
 	fmt.Println("awsctrl -c describe -t AMI ")
 	fmt.Println("awsctrl -c describe -t SecurityGroup ")
+	fmt.Println("awsctrl -c describe -t IAM [-p <role name regexp>]")
+	fmt.Println("awsctrl -c describe -t Subnet [-vpc <vpc id>]")
 	fmt.Println("awsctrl -c appRunner -t EC2 -i <instanceid>")
 	fmt.Println("awsctrl -c up -t EC2 -i <instanceid>")
 	fmt.Println("awsctrl -c up -t appRunner -s <service arn>")
@@ -40,9 +43,11 @@ func Usage() {
 	fmt.Println("awsctrl -c submit -t Batch -n <job queue> -jobdef <job definition[:revision]> [-jobname <name>]")
 	fmt.Println("awsctrl -c cost -start <YYYY-MM-DD> -end <YYYY-MM-DD>")
 	fmt.Println("awsctrl -c detail -t EC2 -i <instanceid>")
+	fmt.Println("awsctrl -c detail -t IAM -n <role name> [-o <file.json>]")
 	fmt.Println("awsctrl -c create -t EC2 -ami <ami id> -type <instance type> -key <string> -nerwork-interfaces <string>")
 	fmt.Println("awsctrl -c exec -exec <cmdstring> -t EC2 -i <instanceid> ")
 	fmt.Println("awsctrl -c cfn -t EC2 -i <instanceid>,<instanceid> -o <template.yaml> [-related=false]")
+	fmt.Println("awsctrl -c vpclist")
 	fmt.Println("awsctrl -c sglist -vpc <vpc id>")
 	fmt.Println("awsctrl -c sgrules -g <group id>")
 	fmt.Println("awsctrl -c sgadd -g <group id> -dir ingress|egress -proto tcp|udp|icmp|-1 -from <port> -to <port> -cidr <cidr> [-desc <text>]")
@@ -95,10 +100,10 @@ func OptionParse() Options {
 	Options.profile = flag.String("profile", "default", "Specifiy Credential profile")
 	Options.region = flag.String("region", "ap-northeast-1", "Specify AWS region")
 	Options.cmd = flag.String("c", "describe", "command : describe | up |down | S3download | AMI |exec | cfn | submit")
-	Options.target = flag.String("t", "EC2", "target : EC2 | appRunner | local dir | ECS | Batch | SecurityGroup")
+	Options.target = flag.String("t", "EC2", "target : EC2 | appRunner | local dir | ECS | Batch | SecurityGroup | IAM | Subnet")
 	Options.pattern = flag.String("p", "", "regression pattern for Names of Tag")
 	Options.file = flag.String("f", "", "upload file name")
-	Options.name = flag.String("n", "", "cluster name / Batch: job queue or compute environment / sgcreate: group name")
+	Options.name = flag.String("n", "", "cluster name / Batch: job queue or compute environment / sgcreate: group name / detail -t IAM: role name")
 	Options.help = flag.String("h", "", "help")
 
 	Options.start = flag.String("start", "", "start time YYYY-MM-DD")
@@ -115,7 +120,7 @@ func OptionParse() Options {
 
 	Options.cmdstring = flag.String("exec", "", "command string")
 
-	Options.output = flag.String("o", "template.yaml", "output file for cfn")
+	Options.output = flag.String("o", "template.yaml", "output file for cfn / detail -t IAM: JSON file (default: stdout)")
 	Options.related = flag.Bool("related", true, "cfn: also include VPC, Subnet and Security Groups of the instances")
 
 	Options.sgDir = flag.String("dir", "ingress", "sgadd/sgdel: rule direction ingress | egress")
@@ -124,7 +129,7 @@ func OptionParse() Options {
 	Options.sgTo = flag.Int64("to", -1, "sgadd/sgdel: to port (ICMP code)")
 	Options.sgCidr = flag.String("cidr", "", "sgadd/sgdel: IPv4 CIDR, e.g. 203.0.113.5/32")
 	Options.sgDesc = flag.String("desc", "", "sgadd: rule description / sgcreate: group description")
-	Options.vpcID = flag.String("vpc", "", "sglist: VPC id")
+	Options.vpcID = flag.String("vpc", "", "sglist / sgcreate / describe -t Subnet: VPC id")
 
 	Options.jobDef = flag.String("jobdef", "", "submit: Batch job definition name[:revision]")
 	Options.jobName = flag.String("jobname", "", "submit: Batch job name (default: <jobdef>-<timestamp>)")
@@ -190,6 +195,12 @@ func main() {
 			fmt.Println("Error: " + err.Error())
 			os.Exit(1)
 		}
+	case "vpclist":
+		svc := ec2.New(sess, aws.NewConfig().WithRegion(*Options.region))
+		if err := utils.ListVPCs(svc); err != nil {
+			fmt.Println("Error: " + err.Error())
+			os.Exit(1)
+		}
 	case "sglist", "sgrules", "sgadd", "sgdel", "sgcreate", "sgdelete", "setsg":
 		svc := ec2.New(sess, aws.NewConfig().WithRegion(*Options.region))
 		rule := utils.SGRuleSpec{
@@ -239,6 +250,11 @@ func main() {
 		if *Options.target == "EC2" {
 			svc := ec2.New(sess, aws.NewConfig().WithRegion(*Options.region))
 			utils.DescribeInstanceDetail(svc, Options.instansString)
+		} else if *Options.target == "IAM" {
+			if err := describeIAMRole(sess, *Options.name, *Options.output, flagWasSet("o")); err != nil {
+				fmt.Println("Error: " + err.Error())
+				os.Exit(1)
+			}
 		} else {
 			fmt.Println("detail target " + *Options.target + " is Invalid")
 		}
@@ -270,6 +286,20 @@ func main() {
 		} else if *Options.target == "SecurityGroup" {
 			svc := ec2.New(sess, aws.NewConfig().WithRegion(*Options.region))
 			utils.DescribeSecurityGroup(svc, Options.groupID)
+
+		} else if strings.EqualFold(*Options.target, "Subnet") {
+			svc := ec2.New(sess, aws.NewConfig().WithRegion(*Options.region))
+			if err := utils.DescribeSubnets(svc, *Options.vpcID); err != nil {
+				fmt.Println("Error: " + err.Error())
+				os.Exit(1)
+			}
+
+		} else if *Options.target == "IAM" {
+			svc := iam.New(sess)
+			if err := utils.ListIAMRoles(svc, *Options.pattern); err != nil {
+				fmt.Println("Error: " + err.Error())
+				os.Exit(1)
+			}
 
 		} else {
 			fmt.Println("describe target " + *Options.target + " is Invalid")
@@ -337,4 +367,37 @@ func main() {
 	default:
 		Usage()
 	}
+}
+
+// describeIAMRole prints the role's JSON to stdout, or writes it to output
+// when -o was given explicitly (its default is the cfn template name).
+func describeIAMRole(sess *session.Session, roleName, output string, toFile bool) error {
+	svc := iam.New(sess)
+	if !toFile {
+		return utils.DescribeIAMRole(svc, roleName, os.Stdout)
+	}
+	f, err := os.Create(output)
+	if err != nil {
+		return err
+	}
+	if err := utils.DescribeIAMRole(svc, roleName, f); err != nil {
+		f.Close()
+		return err
+	}
+	if err := f.Close(); err != nil {
+		return err
+	}
+	fmt.Println("Written: " + output)
+	return nil
+}
+
+// flagWasSet reports whether the named flag was given on the command line.
+func flagWasSet(name string) bool {
+	set := false
+	flag.Visit(func(f *flag.Flag) {
+		if f.Name == name {
+			set = true
+		}
+	})
+	return set
 }

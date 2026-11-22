@@ -4,6 +4,7 @@ package utils
 import (
 	"fmt"
 	"log"
+	"sort"
 	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -183,6 +184,53 @@ func DescribeSecurityGroup(svc *ec2.EC2, groupID *string) {
 	for _, group := range res.SecurityGroups {
 		fmt.Println(*group.GroupId, *group.GroupName, *group.Description)
 	}
+}
+
+// DescribeSubnets prints the subnets in a VPC (all subnets if vpcID is
+// empty), sorted by VPC, AZ and CIDR. Output format (parsed by Ec2Viewer;
+// the name is last because it may contain commas):
+//
+//	Subnet: subnet-xxx, vpc-xxx, 10.0.1.0/24, ap-northeast-1a, available, 251, default=false, publicIP=true, Name=web-a
+func DescribeSubnets(svc *ec2.EC2, vpcID string) error {
+	input := &ec2.DescribeSubnetsInput{}
+	if vpcID != "" {
+		input.Filters = []*ec2.Filter{{Name: aws.String("vpc-id"), Values: []*string{aws.String(vpcID)}}}
+	}
+	var subnets []*ec2.Subnet
+	err := svc.DescribeSubnetsPages(input, func(page *ec2.DescribeSubnetsOutput, _ bool) bool {
+		subnets = append(subnets, page.Subnets...)
+		return true
+	})
+	if err != nil {
+		return err
+	}
+
+	sort.Slice(subnets, func(i, j int) bool {
+		a, b := subnets[i], subnets[j]
+		if va, vb := strOr(a.VpcId, ""), strOr(b.VpcId, ""); va != vb {
+			return va < vb
+		}
+		if za, zb := strOr(a.AvailabilityZone, ""), strOr(b.AvailabilityZone, ""); za != zb {
+			return za < zb
+		}
+		return strOr(a.CidrBlock, "") < strOr(b.CidrBlock, "")
+	})
+
+	for _, s := range subnets {
+		name := "-"
+		for _, tag := range s.Tags {
+			if tag.Key != nil && *tag.Key == "Name" && tag.Value != nil {
+				name = *tag.Value
+				break
+			}
+		}
+		fmt.Printf("Subnet: %s, %s, %s, %s, %s, %d, default=%t, publicIP=%t, Name=%s\n",
+			strOr(s.SubnetId, "None"), strOr(s.VpcId, "-"), strOr(s.CidrBlock, "-"),
+			strOr(s.AvailabilityZone, "-"), strOr(s.State, "-"),
+			aws.Int64Value(s.AvailableIpAddressCount),
+			aws.BoolValue(s.DefaultForAz), aws.BoolValue(s.MapPublicIpOnLaunch), name)
+	}
+	return nil
 }
 
 // DescribeInstanceDetail prints detailed information for a single EC2 instance:
